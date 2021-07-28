@@ -527,6 +527,8 @@ class Citation(object):
 
 
 class OCIManager(object):
+    doi_type = "doi"
+    pmid_type = "pmid"
     def __init__(self, oci_string=None, lookup_file=None, conf_file=None, doi_1=None, doi_2=None, prefix=""):
         self.is_valid = None
         self.messages = []

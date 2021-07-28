@@ -19,6 +19,7 @@ from os import sep
 from index.identifier.doimanager import DOIManager
 from index.identifier.issnmanager import ISSNManager
 from index.identifier.orcidmanager import ORCIDManager
+from index.identifier.pmidmanager import PMIDManager
 from index.storer.csvmanager import CSVManager
 
 
@@ -44,6 +45,16 @@ class IdentifierManagerTest(unittest.TestCase):
         self.invalid_orcid_2 = "0000-0001-5506-5232"
         self.invalid_orcid_3 = "0000-0001-5506-523"
         self.invalid_orcid_4 = "1-5506-5232"
+
+#class extension for pubmedid
+        self.valid_pmid_1 = "2942070"
+        self.valid_pmid_2 = "1509982"
+        self.valid_pmid_3 = "7189714"
+        self.invalid_pmid_1 = "0067308798798"
+        self.invalid_pmid_2 = "pmid:174777777777"
+        self.invalid_pmid_3 = "000009265465465465"
+        self.valid_pmid_path = "index%stest_data%svalid_pmid.csv" % (sep, sep)
+
 
     def test_doi_normalise(self):
         dm = DOIManager()
@@ -96,3 +107,36 @@ class IdentifierManagerTest(unittest.TestCase):
         self.assertFalse(om.is_valid(self.invalid_orcid_2))
         self.assertFalse(om.is_valid(self.invalid_orcid_3))
         self.assertFalse(om.is_valid(self.invalid_orcid_4))
+
+
+#class extension for pubmedid
+    def test_pmid_normalise(self):
+        pm = PMIDManager()
+        self.assertEqual(self.valid_pmid_1, pm.normalise(self.valid_pmid_1.replace("", "pmid:")))
+        self.assertEqual(self.valid_pmid_1, pm.normalise(self.valid_pmid_1.replace("", " ")))
+        self.assertEqual(self.valid_pmid_1, pm.normalise("https://pubmed.ncbi.nlm.nih.gov/"+self.valid_pmid_1))
+        self.assertEqual(self.valid_pmid_2, pm.normalise("000"+self.valid_pmid_2))
+
+    def test_pmid_is_valid(self):
+        pm_nofile = PMIDManager()
+        print(pm_nofile.normalise(self.valid_pmid_1, include_prefix=True ))
+        print(pm_nofile.is_valid(self.valid_pmid_1))
+        self.assertTrue(pm_nofile.is_valid(self.valid_pmid_1))
+        self.assertTrue(pm_nofile.is_valid(self.valid_pmid_2))
+        self.assertTrue(pm_nofile.is_valid(self.valid_pmid_3))
+        self.assertFalse(pm_nofile.is_valid(self.invalid_pmid_1))
+        self.assertFalse(pm_nofile.is_valid(self.invalid_pmid_2))
+        self.assertFalse(pm_nofile.is_valid(self.invalid_pmid_3))
+
+        valid_pmid = CSVManager(self.valid_pmid_path)
+        pm_file = PMIDManager(valid_pmid=valid_pmid, use_api_service=False)
+        self.assertTrue(pm_file.is_valid(self.valid_pmid_1))
+        self.assertFalse(pm_file.is_valid(self.invalid_pmid_1))
+
+        pm_nofile_noapi = PMIDManager(use_api_service=False)
+        self.assertFalse(pm_nofile_noapi.is_valid(self.valid_pmid_1))
+        self.assertFalse(pm_nofile_noapi.is_valid(self.invalid_pmid_1))
+        self.assertFalse(pm_nofile_noapi.is_valid(self.valid_pmid_2))
+        self.assertFalse(pm_nofile_noapi.is_valid(self.invalid_pmid_2))
+        self.assertFalse(pm_nofile_noapi.is_valid(self.valid_pmid_3))
+        self.assertFalse(pm_nofile_noapi.is_valid(self.invalid_pmid_3))

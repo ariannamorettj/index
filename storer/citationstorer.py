@@ -37,7 +37,7 @@ class CitationStorer(object):
 
     def __init__(self, dir_data_path, rdf_resource_base,
                  n_citations_csv_file=10000000, n_citations_rdf_file=1000000, n_citations_slx_file=5000000):
-        self.cur_time = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+        self.cur_time = datetime.now().strftime('%Y-%m-%dT%H%M%S')
         self.citation_dir_data_path = dir_data_path + sep + "data" + sep
         self.citation_dir_prov_path = dir_data_path + sep + "prov" + sep
         self.csv_dir_local_path = "csv" + sep + self.cur_time[:7].replace("-", sep) + sep
@@ -145,6 +145,7 @@ class CitationStorer(object):
     @staticmethod
     def __store_csv_on_file(f_path, header, json_obj):
         f_exists = exists(f_path)
+        print(f_path, f_exists, json_obj)
         with open(f_path, "a", encoding="utf8") as f:
             dw = DictWriter(f, header)
             if not f_exists:

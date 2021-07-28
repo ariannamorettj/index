@@ -46,9 +46,12 @@ class ResourceFinder(object):
         self.date = date
         self.orcid = orcid
         if hasattr(self, 'use_api_service'):
+            print(doi.csv_path)  # index\test_data\valid_doi.csv
             self.dm = DOIManager(doi, self.use_api_service)
+            print("CASE A: elf.dm = DOIManager(id, self.use_api_service)")
         else:
             self.dm = DOIManager(doi)
+            print("CASE B")
         self.im = ISSNManager()
         self.om = ORCIDManager()
 
@@ -101,6 +104,9 @@ class ApiDOIResourceFinder(ResourceFinder):
     # implementation of the previous three methods, since they strictly reuse them
     # for returning the result.
     def get_orcid(self, id_string):
+        print("this is id_string", id_string)
+        print("this is self.orcid", self.orcid)
+        print("this is self._get_item(id_string, self.orcid)", self._get_item(id_string, self.orcid))
         return self._get_item(id_string, self.orcid)
 
     def get_pub_date(self, id_string):
@@ -110,14 +116,19 @@ class ApiDOIResourceFinder(ResourceFinder):
         return self._get_item(id_string, self.issn)
 
     def is_valid(self, id_string):
-        return self.dm.is_valid(id_string)
+        print("self.dm.is_valid(id_string)", self.dm.is_valid(id_string))
+        return self.dm.is_valid(id_string) #FALSE IN BOTH VERSIONS
 
     def normalise(self, id_string):
         return self.dm.normalise(id_string, include_prefix=True)
 
     def _get_item(self, doi_entity, csv_manager):
+        print("doi entity, csv_manager", doi_entity, csv_manager)
+        print("self.is_valid(doi_entity)??????", self.is_valid(doi_entity))
         if self.is_valid(doi_entity):
+            print("PASSA IS_VALID? Con doi_entity=", doi_entity, "and is_valid(doi_entity) =", self.is_valid(doi_entity))
             doi = self.normalise(doi_entity)
+            print("PASSA NORMALISE? Con doi_entity=", doi_entity, "self.normalise(doi_entity) =", self.normalise(doi_entity))
 
             if csv_manager.get_value(doi) is None:
                 json_obj = self._call_api(doi)

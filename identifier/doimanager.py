@@ -45,16 +45,24 @@ class DOIManager(IdentifierManager):
 
     def is_valid(self, id_string):
         doi = self.normalise(id_string, include_prefix=True)
+        print("DOI MANAGER IS_VALID: self.normalise(id_string, include_prefix=True)", self.normalise(id_string, include_prefix=True))
 
+        print("1) doi is None or match(^doi:10..+/.+$, doi) is None?", doi is None, match("^doi:10\\..+/.+$", doi) is None)
         if doi is None or match("^doi:10\\..+/.+$", doi) is None:
             return False
         else:
+            print("self.valid_doi.csv_path:", self.valid_doi.csv_path)
+            print("2) self.valid_doi.get_value(doi) is None?", self.valid_doi.get_value(doi) is None, "for the id:", doi)
             if self.valid_doi.get_value(doi) is None:
                 if self.__doi_exists(doi):
+                    print( "3) does self.__doi_exists(doi)?", self.__doi_exists( doi ), "for the id:", doi )
                     self.valid_doi.add_value(doi, "v")
                 else:
+                    print( "3) does self.__doi_exists(doi)?", self.__doi_exists( doi ), "for the id:", doi )
                     self.valid_doi.add_value(doi, "i")
 
+            print("self.valid_doi.get_value(doi)", self.valid_doi.get_value(doi))
+            print("self.valid_doi.data", self.valid_doi.data)
             return "v" in self.valid_doi.get_value(doi)
 
     def normalise(self, id_string, include_prefix=False):
