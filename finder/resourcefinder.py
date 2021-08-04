@@ -17,7 +17,10 @@
 from index.storer.csvmanager import CSVManager
 from index.identifier.orcidmanager import ORCIDManager
 from index.identifier.doimanager import DOIManager
+from index.identifier.pmidmanager import PMIDManager
 from index.identifier.issnmanager import ISSNManager
+from index.citation.oci import OCIManager
+
 from collections import deque
 # TODO: For multiprocessing purposes
 # from multiprocessing.managers import BaseManager
@@ -29,15 +32,18 @@ class ResourceFinder(object):
     the signatures of the methods that should be implemented, and a basic
     constructor."""
 
-    def __init__(self, date=None, orcid=None, issn=None, doi=None, **params):
+    def __init__(self, date=None, orcid=None, issn=None, id=None, id_type=None, **params): #vedere se crea problemi l'aggiunta di id_type
+        #**params significa che non genera errore a causa di questo: oltre a quelli obbligatori (o meglio, i default),
+        #se ne possono aggiungere altri a piacimento. è importante perché nel resource finder abbiamo indicato i parametri generali, ma alcuni specifici hanno bisogno di altri parametri
+        #qui bisognava lasciare l'opportunità di lasciare l'estensione ragionevole. quindi per lui id era in default none e doi era un'altra cosa
         if date is None:
             date = CSVManager(store_new=False)
         if orcid is None:
             orcid = CSVManager(store_new=False)
         if issn is None:
             issn = CSVManager(store_new=False)
-        if doi is None:
-            doi = CSVManager(store_new=False)
+        if id is None:
+            id = CSVManager(store_new=False)
 
         for key in params:
             setattr(self, key, params[key])
@@ -45,13 +51,23 @@ class ResourceFinder(object):
         self.issn = issn
         self.date = date
         self.orcid = orcid
+        self.id_type = id_type
         if hasattr(self, 'use_api_service'):
-            print(doi.csv_path)  # index\test_data\valid_doi.csv
-            self.dm = DOIManager(doi, self.use_api_service)
-            print("CASE A: elf.dm = DOIManager(id, self.use_api_service)")
+            if id_type is OCIManager.doi_type:
+                print(id.csv_path)  # None
+                self.dm = DOIManager(id, self.use_api_service)
+            elif id_type is OCIManager.pmid_type:
+                self.pm = PMIDManager(id, self.use_api_service)
+            else:
+                print("The id_type specified is not compliant")
         else:
-            self.dm = DOIManager(doi)
-            print("CASE B")
+            if id_type is OCIManager.doi_type:
+                self.dm = DOIManager(id)
+            elif id_type is OCIManager.pmid_type:
+                self.pm = PMIDManager(id)
+            else:
+                print("The id_type specified is not compliant")
+
         self.im = ISSNManager()
         self.om = ORCIDManager()
 
@@ -79,8 +95,7 @@ class ResourceFinder(object):
     def normalise(self, id_string):
         pass
 
-
-class ApiDOIResourceFinder(ResourceFinder):
+class ApiIDResourceFinder(ResourceFinder): #The name of the class was changed
     """This is the abstract class that must be implemented by any resource finder
         for a particular service which is based on DOI retrieving via HTTP REST APIs
         (Crossref, DataCite). It provides basic methods that are be used for
@@ -97,55 +112,66 @@ class ApiDOIResourceFinder(ResourceFinder):
     def _get_orcid(self, json_obj):
         return set()
 
-    def _call_api(self, doi_full):
+    def _call_api(self, id_full):
         pass
 
     # The implementation of the following methods is strictly dependent on the actual
     # implementation of the previous three methods, since they strictly reuse them
     # for returning the result.
     def get_orcid(self, id_string):
-        print("this is id_string", id_string)
-        print("this is self.orcid", self.orcid)
-        print("this is self._get_item(id_string, self.orcid)", self._get_item(id_string, self.orcid))
         return self._get_item(id_string, self.orcid)
 
     def get_pub_date(self, id_string):
         return self._get_item(id_string, self.date)
 
     def get_container_issn(self, id_string):
+        print("self._get_item(id_string, self.issn)", self._get_item(id_string, self.issn), "per l'id string:", id_string, "e il self.issn", self.issn)
         return self._get_item(id_string, self.issn)
 
-    def is_valid(self, id_string):
-        print("self.dm.is_valid(id_string)", self.dm.is_valid(id_string))
-        return self.dm.is_valid(id_string) #FALSE IN BOTH VERSIONS
+    def is_valid(self, id_string): #FAI IN TUTTI COSì
+        print("id_string", id_string, "id_type", self.id_type)
+        if self.id_type == OCIManager.doi_type:
+            print("IT IS A DOI")
+            return self.dm.is_valid(id_string)
+        elif self.id_type == OCIManager.pmid_type:
+            print("IT IS A PMID")
+            return self.pm.is_valid(id_string)
+        else:
+            print("The id_type specified is not compliant")
 
     def normalise(self, id_string):
-        return self.dm.normalise(id_string, include_prefix=True)
+        if self.id_type is OCIManager.doi_type:
+            return self.dm.normalise(id_string, include_prefix=True)
+        elif self.id_type is OCIManager.pmid_type:
+            return self.pm.normalise(id_string, include_prefix=True)
+        else:
+            print("The id_type specified is not compliant")
 
-    def _get_item(self, doi_entity, csv_manager):
-        print("doi entity, csv_manager", doi_entity, csv_manager)
-        print("self.is_valid(doi_entity)??????", self.is_valid(doi_entity))
-        if self.is_valid(doi_entity):
-            print("PASSA IS_VALID? Con doi_entity=", doi_entity, "and is_valid(doi_entity) =", self.is_valid(doi_entity))
-            doi = self.normalise(doi_entity)
-            print("PASSA NORMALISE? Con doi_entity=", doi_entity, "self.normalise(doi_entity) =", self.normalise(doi_entity))
 
-            if csv_manager.get_value(doi) is None:
-                json_obj = self._call_api(doi)
+    def _get_item(self, id_entity, csv_manager):
+        print("id_entity",id_entity)
+        print("csv_manager",csv_manager)
+        if self.is_valid(id_entity):
+            print("self.is_valid(id_entity)",self.is_valid(id_entity))
+            id = self.normalise(id_entity)
+            print("self.normalise(id_entity)",self.normalise(id_entity))
+            if csv_manager.get_value(id) is None:
+                print("csv_manager.get_value(id) is None for", csv_manager.get_value(id))
+                json_obj = self._call_api(id) #la prima volta c'erano solo json. quello che restituirà sarà sicuramente compliant. Non è un problema è solo il nome della variabile
 
                 if json_obj is not None:
                     for issn in self._get_issn(json_obj):
-                        self.issn.add_value(doi, issn)
+                        self.issn.add_value(id, issn)
 
-                    if self.date.get_value(doi) is None:
+                    if self.date.get_value(id) is None:
                         pub_date = self._get_date(json_obj)
                         if pub_date is not None:
-                            self.date.add_value(doi, pub_date)
+                            self.date.add_value(id, pub_date)
 
                     for orcid in self._get_orcid(json_obj):
-                        self.orcid.add_value(doi, orcid)
+                        self.orcid.add_value(id, orcid)
 
-            return csv_manager.get_value(doi)
+            return csv_manager.get_value(id)
 
 
 class ResourceFinderHandler(object):

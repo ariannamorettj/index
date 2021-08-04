@@ -14,19 +14,20 @@
 # ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
 # SOFTWARE.
 
-from index.finder.resourcefinder import ApiDOIResourceFinder
+from index.finder.resourcefinder import ApiIDResourceFinder
+from index.citation.oci import OCIManager
 from json import loads
 from urllib.parse import quote
 from requests import get
 import index.support.dictionary as sd
 
 
-class DataCiteResourceFinder(ApiDOIResourceFinder):
+class DataCiteResourceFinder(ApiIDResourceFinder):
     def __init__(self, date=None, orcid=None, issn=None, doi=None, use_api_service=True):
         self.api = "https://api.datacite.org/dois/"
         self.use_api_service = use_api_service
-        super(DataCiteResourceFinder, self).__init__(date=date, orcid=orcid, issn=issn, doi=doi,
-                                                     use_api_service=use_api_service)
+        super(DataCiteResourceFinder, self).__init__(date=date, orcid=orcid, issn=issn, id=doi, id_type=OCIManager.doi_type,
+                                                     use_api_service=use_api_service) #doi=doi corrected: id=doi
 
     def _get_orcid(self, json_obj):
         result = set()
@@ -47,7 +48,7 @@ class DataCiteResourceFinder(ApiDOIResourceFinder):
 
     def _get_issn(self, json_obj):
         result = set()
-        
+
         if json_obj is not None:
             obj_types = json_obj.get("types")
             if obj_types is not None and sd.contains(obj_types, "citeproc", "journal"):

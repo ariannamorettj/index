@@ -14,7 +14,8 @@
 # ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
 # SOFTWARE.
 
-from index.finder.resourcefinder import ApiDOIResourceFinder
+from index.finder.resourcefinder import ApiIDResourceFinder
+from index.citation.oci import OCIManager
 from requests import get
 from urllib.parse import quote
 from json import loads
@@ -22,11 +23,11 @@ import index.support.dictionary as sd
 from datetime import datetime
 
 
-class CrossrefResourceFinder(ApiDOIResourceFinder):
+class CrossrefResourceFinder(ApiIDResourceFinder):
     def __init__(self, date=None, orcid=None, issn=None, doi=None, use_api_service=True):
         self.use_api_service = use_api_service
         self.api = "https://api.crossref.org/works/"
-        super(CrossrefResourceFinder, self).__init__(date=date, orcid=orcid, issn=issn, doi=doi,
+        super(CrossrefResourceFinder, self).__init__(date=date, orcid=orcid, issn=issn, id=doi, id_type=OCIManager.doi_type,
                                                      use_api_service=use_api_service)
 
     def _get_orcid(self, json_obj):
@@ -77,7 +78,7 @@ class CrossrefResourceFinder(ApiDOIResourceFinder):
 
             return result
 
-    def _call_api(self, doi_full):
+    def _call_api(self, doi_full): #uniformato alla versione corrente di oc
         if self.use_api_service:
             doi = self.dm.normalise(doi_full)
             r = get(self.api + quote(doi), headers=self.headers, timeout=30)

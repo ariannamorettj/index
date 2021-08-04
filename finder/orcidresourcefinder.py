@@ -14,7 +14,8 @@
 # ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
 # SOFTWARE.
 
-from index.finder.resourcefinder import ApiDOIResourceFinder
+from index.finder.resourcefinder import ApiIDResourceFinder
+from index.citation.oci import OCIManager
 from requests import get
 from urllib.parse import quote
 from json import loads
@@ -22,17 +23,17 @@ import index.support.dictionary as sd
 from datetime import datetime
 
 
-class ORCIDResourceFinder(ApiDOIResourceFinder):
+class ORCIDResourceFinder(ApiIDResourceFinder):
     def __init__(self, date=None, orcid=None, issn=None, doi=None, use_api_service=True, key=None):
         self.key = key
         self.use_api_service = use_api_service
         self.api = "https://pub.orcid.org/v2.1/search?q="
-        super(ORCIDResourceFinder, self).__init__(date=date, orcid=orcid, issn=issn, doi=doi,
-                                                  use_api_service=use_api_service)
+        super(ORCIDResourceFinder, self).__init__(date=date, orcid=orcid, issn=issn, id=doi, id_type=OCIManager.doi_type,
+                                                  use_api_service=use_api_service) # parameter is called id instead of doi in ResourceFinder
 
     def _get_orcid(self, json_obj):
         result = set()
-
+        print("IN REALTA' SONO QUI")
         if json_obj is not None:
             for item in json_obj:
                 orcid = item.get("orcid-identifier")

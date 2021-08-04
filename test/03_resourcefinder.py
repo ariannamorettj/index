@@ -19,6 +19,7 @@ from os import sep
 from index.storer.csvmanager import CSVManager
 from index.finder.crossrefresourcefinder import CrossrefResourceFinder
 from index.finder.dataciteresourcefinder import DataCiteResourceFinder
+from index.finder.nihresourcefinder import NIHResourceFinder
 from index.finder.orcidresourcefinder import ORCIDResourceFinder
 from index.finder.resourcefinder import ResourceFinderHandler
 
@@ -28,27 +29,32 @@ class ResourceFinderTest(unittest.TestCase):
 
     def setUp(self):
         self.date_path = "index%stest_data%sid_date.csv" % (sep, sep)
+        self.date_path_pmid = "index%stest_data%sid_date_pmid.csv" % (sep, sep)
         self.orcid_path = "index%stest_data%sid_orcid.csv" % (sep, sep)
+        self.orcid_path_pmid = "index%stest_data%sid_orcid_pmid.csv" % (sep, sep)
         self.issn_path = "index%stest_data%sid_issn.csv" % (sep, sep)
+        self.issn_path_pmid = "index%stest_data%sid_issn_pmid.csv" % (sep, sep)
         self.doi_path = "index%stest_data%svalid_doi.csv" % (sep, sep)
+        self.pmid_path = "index%stest_data%svalid_pmid.csv" % (sep, sep)
 
     def test_handler_get_date(self):
         handler = ResourceFinderHandler(
-            [CrossrefResourceFinder(), DataCiteResourceFinder(), ORCIDResourceFinder()])
+            [CrossrefResourceFinder(), DataCiteResourceFinder(), ORCIDResourceFinder(), NIHResourceFinder()])
         self.assertEqual("2019-05-27", handler.get_date("10.6092/issn.2532-8816/8555"))
         self.assertNotEqual("2019-05-27", handler.get_date("10.1108/jd-12-2013-0166"))
 
     def test_handler_share_issn(self):
         handler = ResourceFinderHandler(
-            [CrossrefResourceFinder(), DataCiteResourceFinder(), ORCIDResourceFinder()])
+            [CrossrefResourceFinder(), DataCiteResourceFinder(), ORCIDResourceFinder(), NIHResourceFinder()])
         self.assertTrue(handler.share_issn("10.1007/s11192-018-2988-z", "10.1007/s11192-015-1565-y"))
+        #self.assertTrue(handler.share_issn("1609936", "1509982"))
         self.assertFalse(handler.share_issn("10.1007/s11192-018-2988-z", "10.6092/issn.2532-8816/8555"))
 
     def test_handler_share_orcid(self):
         handler = ResourceFinderHandler(
-            [CrossrefResourceFinder(), DataCiteResourceFinder(), ORCIDResourceFinder()])
+            [CrossrefResourceFinder(), DataCiteResourceFinder(), ORCIDResourceFinder(), NIHResourceFinder()])
         self.assertTrue(handler.share_orcid("10.1007/s11192-018-2988-z", "10.5281/zenodo.3344898"))
-        self.assertFalse(handler.share_issn("10.1007/s11192-018-2988-z", "10.1007/s11192-015-1565-y5"))
+        self.assertFalse(handler.share_orcid("10.1007/s11192-018-2988-z", "10.1007/s11192-015-1565-y5"))
 
     def test_orcid_get_orcid(self):
         # Do not use support files, only APIs
@@ -164,3 +170,55 @@ class ResourceFinderTest(unittest.TestCase):
         # Do not use support files neither APIs
         cf_3 = CrossrefResourceFinder(use_api_service=False)
         self.assertIsNone(cf_3.get_pub_date("10.1007/s11192-018-2988-z"))
+
+    def test_nationalinstititeofhealth_get_orcid(self):
+        #Do not use support files, only APIs
+        nf_1 = NIHResourceFinder()
+        self.assertIsNone(nf_1.get_orcid("7189714"))
+        self.assertIsNone(nf_1.get_orcid("1509982"))
+
+        # Do use support files, but avoid using APIs
+        nf_2 = NIHResourceFinder(orcid=CSVManager(self.orcid_path_pmid),
+                                      pmid=CSVManager(self.pmid_path), use_api_service=False)
+        self.assertIn("0000-0002-1825-0097", nf_2.get_orcid("7189714"))
+        self.assertNotIn("0000-0002-1825-0098", nf_2.get_orcid("1509982"))
+
+        # Do not use support files neither APIs
+        nf_3 = NIHResourceFinder(use_api_service=False)
+        self.assertIsNone(nf_3.get_orcid("7189714"))
+
+    def test_nationalinstititeofhealth_get_issn(self):
+        # Do not use support files, only APIs
+        nf_1 = NIHResourceFinder()
+        self.assertIn("0003-4819", nf_1.get_container_issn("2942070"))
+        self.assertNotIn("0003-0000", nf_1.get_container_issn("2942070"))
+
+        # # Do use support files, but avoid using APIs
+        nf_2 = NIHResourceFinder(issn=CSVManager(self.issn_path_pmid),
+                                      pmid=CSVManager(self.pmid_path), use_api_service=False)
+        print("self.issn_path_pmid", self.issn_path_pmid)
+        print("self.pmid_path", self.pmid_path)
+        container = nf_2.get_container_issn("1509982")
+        print("container", container)
+        self.assertIn("0065-4299", container)
+        self.assertNotIn("0065-4444", nf_2.get_container_issn("1509982"))
+
+        # Do not use support files neither APIs
+        nf_3 = NIHResourceFinder(use_api_service=False)
+        self.assertIsNone(nf_3.get_container_issn("7189714"))
+
+    def test_nationalinstititeofhealth_get_pub_date(self):
+        # Do not use support files, only APIs
+        nf_1 = NIHResourceFinder()
+        self.assertIn("1998-05-25", nf_1.get_pub_date("9689714"))
+        self.assertNotEqual("1998", nf_1.get_pub_date("9689714"))
+
+        # Do not use support files, only APIs
+        nf_2 = NIHResourceFinder(date=CSVManager(self.date_path_pmid),
+                                      pmid=CSVManager(self.pmid_path), use_api_service=False)
+        self.assertIn("1980-06", nf_2.get_pub_date("7189714"))
+        self.assertNotEqual("1980-06-22", nf_2.get_pub_date("7189714"))
+
+        # Do not use support files neither APIs
+        nf_3 = NIHResourceFinder(use_api_service=False)
+        self.assertIsNone(nf_3.get_pub_date("2942070"))
