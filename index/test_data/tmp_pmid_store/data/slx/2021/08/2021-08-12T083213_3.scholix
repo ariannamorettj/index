@@ -1,0 +1,110 @@
+[
+{
+    "LinkPublicationDate": "2018-11-01T09:14:03",
+    "LinkProvider": [
+        {
+            "Name": "OpenCitations"
+        },
+        {
+            "Name": "OpenCitations Index: NOCI"
+        }
+    ],
+    "RelationshipType": {
+        "Name": "References"
+    },
+    "LicenseURL": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+    "Source": {
+        "Identifier": {
+            "ID": "2140506",
+            "IDScheme": "pmid",
+            "IDURL": "https://pubmed.ncbi.nlm.nih.gov/2140506"
+        },
+        "Type": {
+            "Name": "literature"
+        },
+        "PublicationDate": "1990-04"
+    },
+    "Target": {
+        "Identifier": {
+            "ID": "2942070",
+            "IDScheme": "pmid",
+            "IDURL": "https://pubmed.ncbi.nlm.nih.gov/2942070"
+        },
+        "Type": {
+            "Name": "literature"
+        },
+        "PublicationDate": "1986-08"
+    }
+},
+{
+    "LinkPublicationDate": "2018-11-01T14:51:52",
+    "LinkProvider": [
+        {
+            "Name": "OpenCitations"
+        },
+        {
+            "Name": "OpenCitations Index: NOCI"
+        }
+    ],
+    "RelationshipType": {
+        "Name": "References"
+    },
+    "LicenseURL": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+    "Source": {
+        "Identifier": {
+            "ID": "1523579",
+            "IDScheme": "pmid",
+            "IDURL": "https://pubmed.ncbi.nlm.nih.gov/1523579"
+        },
+        "Type": {
+            "Name": "literature"
+        },
+        "PublicationDate": "2018-06"
+    },
+    "Target": {
+        "Identifier": {
+            "ID": "7097569",
+            "IDScheme": "pmid",
+            "IDURL": "https://pubmed.ncbi.nlm.nih.gov/7097569"
+        },
+        "Type": {
+            "Name": "literature"
+        },
+        "PublicationDate": "1982-08"
+    }
+},
+{
+    "LinkPublicationDate": "2018-11-01T14:51:52",
+    "LinkProvider": [
+        {
+            "Name": "OpenCitations"
+        },
+        {
+            "Name": "OpenCitations Index: NOCI"
+        }
+    ],
+    "RelationshipType": {
+        "Name": "References"
+    },
+    "LicenseURL": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+    "Source": {
+        "Identifier": {
+            "ID": "1509982",
+            "IDScheme": "pmid",
+            "IDURL": "https://pubmed.ncbi.nlm.nih.gov/1509982"
+        },
+        "Type": {
+            "Name": "literature"
+        }
+    },
+    "Target": {
+        "Identifier": {
+            "ID": "6501574",
+            "IDScheme": "pmid",
+            "IDURL": "https://pubmed.ncbi.nlm.nih.gov/6501574"
+        },
+        "Type": {
+            "Name": "literature"
+        }
+    }
+}]
