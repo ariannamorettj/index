@@ -17,204 +17,199 @@
 from argparse import ArgumentParser
 from urllib.parse import quote
 from datetime import datetime
-from os.path import abspath, dirname, basename
 from os import sep
-from sys import path
-from importlib import import_module
-from index.storer.csvmanager import CSVManager
-from index.identifier.doimanager import DOIManager
-from index.finder.orcidresourcefinder import ORCIDResourceFinder
-from index.finder.dataciteresourcefinder import DataCiteResourceFinder
-from index.finder.crossrefresourcefinder import CrossrefResourceFinder
-from index.finder.resourcefinder import ResourceFinderHandler
-from index.citation.oci import OCIManager, Citation
+from index.citation.oci import Citation
 from index.storer.citationstorer import CitationStorer
+from index.storer.datahandler import FileDataHandler
+import ray
 
 
-def execute_workflow_parallel():
-    pass  # TODO
+@ray.remote
+class ParallelFileDataHandler( FileDataHandler ):
+    """This class makes the FileDataHandler class as a remote object"""
+    pass
 
 
-def create_csv(doi_file, date_file, orcid_file, issn_file):
-    valid_doi = CSVManager(csv_path=doi_file)
-    id_date = CSVManager(csv_path=date_file)
-    id_orcid = CSVManager(csv_path=orcid_file)
-    id_issn = CSVManager(csv_path=issn_file)
-
-    return valid_doi, id_date, id_orcid, id_issn
-
-
-def import_citation_source(python, pclass, input):
-    addon_abspath = abspath(python)
-    path.append(dirname(addon_abspath))
-    addon = import_module(basename(addon_abspath).replace(".py", ""))
-    return getattr(addon, pclass)(input)
-
-
-def execute_workflow(idbaseurl, baseurl, python, pclass, input, doi_file, date_file,
-                     orcid_file, issn_file, orcid, lookup, data, prefix, agent, source, service, verbose, no_api):
-    # Create the support file for handling information about bibliographic resources
-    valid_doi, id_date, id_orcid, id_issn = create_csv(doi_file, date_file, orcid_file, issn_file)
-
-    doi_manager = DOIManager(valid_doi, use_api_service=not no_api)
-    crossref_rf = CrossrefResourceFinder(
-        date=id_date, orcid=id_orcid, issn=id_issn, doi=valid_doi, use_api_service=not no_api)
-    datacite_rf = DataCiteResourceFinder(
-        date=id_date, orcid=id_orcid, issn=id_issn, doi=valid_doi, use_api_service=not no_api)
-    orcid_rf = ORCIDResourceFinder(
-        date=id_date, orcid=id_orcid, issn=id_issn, doi=valid_doi,
-        use_api_service=True if orcid is not None and not no_api else False, key=orcid)
-
-    rf_handler = ResourceFinderHandler([crossref_rf, datacite_rf, orcid_rf])
-    return extract_citations(idbaseurl, baseurl, python, pclass, input, lookup, data, prefix,
-                             agent, source, service, verbose, doi_manager, rf_handler)
+def execute_workflow(idbaseurl, baseurl, pclass, inp, doi_file, date_file,
+                     orcid_file, issn_file, orcid, lookup, data, prefix, agent,
+                     source, service, verbose, no_api, process_number, id_type):
+    if process_number > 1:  # Run process in parallel via RAY
+        ray.init( num_cpus=process_number )
+        p_handler = ParallelFileDataHandler.remote( pclass, inp, lookup )
+        print( "[parallel] Initialising the data handler" )
+        id_remote_init = p_handler.init.remote( data, doi_file, date_file, orcid_file, issn_file, orcid, no_api, id_type)
+        ray.wait( [id_remote_init] )  # wait until the handler is not ready
+        print( "[parallel] The data handler has been initialised, and the extraction of citations begins" )
+        futures = [_parallel_extract_citations.remote( data, idbaseurl, baseurl, prefix, agent, source,
+                                                       service, verbose, p_handler, str( i ) )
+                   for i in range( process_number - 1 )]
+        ray.get( futures )
+        return ray.get( p_handler.get_values.remote() )
+    else:
+        p_handler = FileDataHandler( pclass, inp, lookup )
+        print( "[standalone] Initialising the data handler" )
+        p_handler.init( data, doi_file, date_file, orcid_file, issn_file, orcid, no_api, id_type)
+        print( "[standalone] The data handler has been initialised, and the extraction of citations begins" )
+        _extract_citations( data, idbaseurl, baseurl, prefix, agent, source, service, verbose, p_handler )
+        return p_handler.get_values()
 
 
-def extract_citations(idbaseurl, baseurl, python, pclass, input, lookup, data, prefix,
-                      agent, source, service, verbose, doi_manager, rf_handler, oci_to_do=None):
+@ray.remote
+def _parallel_extract_citations(data, idbaseurl, baseurl, prefix, agent,
+                                source, service, verbose, p_handler, suffix):
+    return _extract_citations( data, idbaseurl, baseurl, prefix, agent,
+                               source, service, verbose, p_handler, suffix, True )
+
+
+def _extract_citations(data, idbaseurl, baseurl, prefix, agent,
+                       source, service, verbose, p_handler, suffix="", parallel=False):
+    h_get_next_citation_data = lambda h: \
+        ray.get( h.get_next_citation_data.remote() ) if parallel \
+            else h.get_next_citation_data()
+    h_get_oci = lambda h, citing, cited, prefix: \
+        ray.get( h.get_oci.remote( citing, cited, prefix ) ) if parallel \
+            else h.get_oci( citing, cited, prefix )
+    h_oci_exists = lambda h, oci: \
+        ray.get( h.oci_exists.remote( oci ) ) if parallel \
+            else h.oci_exists( oci )
+    h_are_valid = lambda h, citing, cited: \
+        ray.get( h.are_valid.remote( citing, cited ) ) if parallel \
+            else h.are_valid( citing, cited )
+    h_get_date = lambda h, id_string: \
+        ray.get( h.get_date.remote( id_string ) ) if parallel \
+            else h.get_date( id_string )
+    h_share_issn = lambda h, citing, cited: \
+        ray.get( h.share_issn.remote( citing, cited ) ) if parallel \
+            else h.share_issn( citing, cited )
+    h_share_orcid = lambda h, citing, cited: \
+        ray.get( h.share_orcid.remote( citing, cited ) ) if parallel \
+            else h.share_orcid( citing, cited )
+
     BASE_URL = idbaseurl
-    DATASET_URL = baseurl + "/" if not baseurl.endswith("/") else baseurl
+    DATASET_URL = baseurl + "/" if not baseurl.endswith( "/" ) else baseurl
 
-    oci_manager = OCIManager(lookup_file=lookup)
-    exi_ocis = CSVManager.load_csv_column_as_set(data + sep + "data", "oci")  # TODO: we need to specify carefully the dir, eg by adding an additional flag to distinguish between the files belonging to a particular process, and it should be aligned with the storer.
-    if oci_to_do is not None:
-        oci_to_do.difference_update(exi_ocis)
-    cit_storer = CitationStorer(data, DATASET_URL)
-
-    citations_already_present = 0
-    new_citations_added = 0
-    error_in_dois_existence = 0
-
-    cs = import_citation_source(python, pclass, input)
-    next_citation = cs.get_next_citation_data()
+    cit_storer = CitationStorer( data, DATASET_URL, suffix=suffix )
+    next_citation = h_get_next_citation_data( p_handler )
 
     while next_citation is not None:
         citing, cited, created, timespan, journal_sc, author_sc = next_citation
-        oci = oci_manager.get_oci(citing, cited, prefix)
-        oci_noprefix = oci.replace("oci:", "")
-        if oci_noprefix not in exi_ocis and (oci_to_do is None or oci_noprefix in oci_to_do):
-            if doi_manager.is_valid(citing) and doi_manager.is_valid(cited):
+        oci = h_get_oci( p_handler, citing, cited, prefix )
+        oci_noprefix = oci.replace( "oci:", "" )
+
+        if not h_oci_exists( p_handler, oci_noprefix ):
+            if h_are_valid( p_handler, citing, cited ):
                 if created is None:
-                    citing_date = rf_handler.get_date(citing)
+                    citing_date = h_get_date( p_handler, citing )
                 else:
                     citing_date = created
-                cited_date = rf_handler.get_date(cited)
-                if journal_sc is None or type(journal_sc) is not bool:
-                    journal_sc = rf_handler.share_issn(citing, cited)
-                if author_sc is None or type(author_sc) is not bool:
-                    author_sc = rf_handler.share_orcid(citing, cited)
+                cited_date = h_get_date( p_handler, cited )
+                if journal_sc is None or type( journal_sc ) is not bool:
+                    journal_sc = h_share_issn( p_handler, citing, cited )
+                if author_sc is None or type( author_sc ) is not bool:
+                    author_sc = h_share_orcid( p_handler, citing, cited )
 
                 if created is not None and timespan is not None:
-                    cit = Citation(oci,
-                                   BASE_URL + quote(citing), None,
-                                   BASE_URL + quote(cited), None,
-                                   created, timespan,
-                                   1, agent, source, datetime.now().strftime('%Y-%m-%dT%H:%M:%S'),
-                                   service, "doi", BASE_URL + "([[XXX__decode]])", "reference",
-                                   journal_sc, author_sc,
-                                   None, "Creation of the citation", None)
+                    cit = Citation( oci,
+                                    BASE_URL + quote( citing ), None,
+                                    BASE_URL + quote( cited ), None,
+                                    created, timespan,
+                                    1, agent, source, datetime.now().strftime( '%Y-%m-%dT%H:%M:%S' ),
+                                    service, "doi", BASE_URL + "([[XXX__decode]])", "reference",
+                                    journal_sc, author_sc,
+                                    None, "Creation of the citation", None )
                 else:
-                    cit = Citation(oci,
-                                   BASE_URL + quote(citing), citing_date,
-                                   BASE_URL + quote(cited), cited_date,
-                                   None, None,
-                                   1, agent, source, datetime.now().strftime('%Y-%m-%dT%H:%M:%S'),
-                                   service, "doi", BASE_URL + "([[XXX__decode]])", "reference",
-                                   journal_sc, author_sc,
-                                   None, "Creation of the citation", None)
+                    cit = Citation( oci,
+                                    BASE_URL + quote( citing ), citing_date,
+                                    BASE_URL + quote( cited ), cited_date,
+                                    None, None,
+                                    1, agent, source, datetime.now().strftime( '%Y-%m-%dT%H:%M:%S' ),
+                                    service, "doi", BASE_URL + "([[XXX__decode]])", "reference",
+                                    journal_sc, author_sc,
+                                    None, "Creation of the citation", None )
 
-                cit_storer.store_citation(cit)
+                cit_storer.store_citation( cit )
 
                 if verbose:
-                    print("Create citation data for '%s' between DOI '%s' and DOI '%s'" % (oci, citing, cited))
-                new_citations_added += 1
-                exi_ocis.add(oci_noprefix)
+                    print( "Create citation data for '%s' between ID '%s' and ID '%s'" % (oci, citing, cited) )
             else:
                 if verbose:
-                    print("WARNING: some DOIs, among '%s' and '%s', do not exist" % (citing, cited))
-                error_in_dois_existence += 1
-            if oci_to_do is not None:
-                oci_to_do.remove(oci_noprefix)
+                    print( "WARNING: some IDs, among '%s' and '%s', do not exist" % (citing, cited) )
         else:
             if verbose:
-                print("WARNING: the citation between DOI '%s' and DOI '%s' has been already processed" %
-                      (citing, cited))
-            citations_already_present += 1
+                print( "WARNING: the citation between ID '%s' and ID '%s' has been already processed" %
+                       (citing, cited) )
 
-        next_citation = cs.get_next_citation_data()
-
-    return new_citations_added, citations_already_present, error_in_dois_existence
+        next_citation = h_get_next_citation_data( p_handler )
 
 
 if __name__ == "__main__":
-    arg_parser = ArgumentParser("cnc.py (Create New Citations",
-                                description="This tool allows one to take a series of entity-to-entity"
-                                            "citation data, and to store it according to CSV used by"
-                                            "the OpenCitations Indexes so as to be added to an Index. It uses"
-                                            "several online services to check several things to create the"
-                                            "final CSV/TTL/Scholix files.")
+    arg_parser = ArgumentParser( "cnc.py (Create New Citations",
+                                 description="This tool allows one to take a series of entity-to-entity"
+                                             "citation data, and to store it according to CSV used by"
+                                             "the OpenCitations Indexes so as to be added to an Index. It uses"
+                                             "several online services to check several things to create the"
+                                             "final CSV/TTL/Scholix files." )
 
-    arg_parser.add_argument("-p", "--python", required=True,
-                            help="The input Python file implementing the class index.citation.CitationSource "
-                                 "which is responsible for parsing and passing all the input entity-to-entity"
-                                 "citations.")
-    arg_parser.add_argument("-c", "--pclass", required=True,
-                            help="The name of the class implementing the class index.citation.CitationSource "
-                                 "which is responsible for parsing and passing all the input entity-to-entity"
-                                 "citations.")
-    arg_parser.add_argument("-i", "--input", required=True,
-                            help="The input file/directory to provide as input of the specified input "
-                                 "Python file (using -p).")
-    arg_parser.add_argument("-d", "--data", required=True,
-                            help="The directory containing all the CSV files already added in the Index, "
-                                 "including data and provenance files.")
-    arg_parser.add_argument("-o", "--orcid", default=None,
-                            help="ORCID API key to be used to query the ORCID API.")
-    arg_parser.add_argument("-l", "--lookup", required=True,
-                            help="The lookup table that must be used to produce OCIs.")
-    arg_parser.add_argument("-b", "--baseurl", required=True, default="",
-                            help="The base URL of the dataset")
-    arg_parser.add_argument("-ib", "--idbaseurl", required=True, default="",
-                            help="The base URL of the identifier of citing and cited entities, if any")
-    arg_parser.add_argument("-doi", "--doi_file", default=None,
-                            help="The file where the valid and invalid DOIs are stored.")
-    arg_parser.add_argument("-date", "--date_file", default=None,
-                            help="The file that maps id of bibliographic resources with their publication date.")
-    arg_parser.add_argument("-orcid", "--orcid_file", default=None,
-                            help="The file that maps id of bibliographic resources with the ORCID of its authors.")
-    arg_parser.add_argument("-issn", "--issn_file", default=None,
-                            help="The file that maps id of bibliographic resources with the ISSN of the journal "
-                                 "they have been published in.")
-    arg_parser.add_argument("-px", "--prefix", default="",
-                            help="The '0xxx0' prefix to use for creating the OCIs.")
-    arg_parser.add_argument("-a", "--agent", required=True, default="https://w3id.org/oc/index/prov/pa/1",
-                            help="The URL of the agent providing or processing the citation data.")
-    arg_parser.add_argument("-s", "--source", required=True,
-                            help="The URL of the source from where the citation data have been extracted.")
-    arg_parser.add_argument("-sv", "--service", required=True,
-                            help="The name of the service that will made available the citation data.")
-    arg_parser.add_argument("-v", "--verbose", action="store_true", default=False,
-                            help="Print the messages on screen.")
-    arg_parser.add_argument("-na", "--no_api", action="store_true", default=False,
-                            help="Tell the tool explicitly not to use the APIs of the various finders.")
-    arg_parser.add_argument("-pn", "--process_number", default=1, type=int,
-                            help="The number of parallel process to run for working on the creation of citations.")
+    arg_parser.add_argument( "-c", "--pclass", required=True,
+                             help="The name of the class of data source to use to process citatation data.",
+                             choices=['csv', 'crossref', 'croci'] )
+    arg_parser.add_argument( "-i", "--input", required=True,
+                             help="The input file/directory to provide as input of the specified input "
+                                  "Python file (using -p)." )
+    arg_parser.add_argument( "-d", "--data", required=True,
+                             help="The directory containing all the CSV files already added in the Index, "
+                                  "including data and provenance files." )
+    arg_parser.add_argument( "-o", "--orcid", default=None,
+                             help="ORCID API key to be used to query the ORCID API." )
+    arg_parser.add_argument( "-l", "--lookup", required=True,
+                             help="The lookup table that must be used to produce OCIs." )
+    arg_parser.add_argument( "-b", "--baseurl", required=True, default="",
+                             help="The base URL of the dataset" )
+    arg_parser.add_argument( "-ib", "--idbaseurl", required=True, default="",
+                             help="The base URL of the identifier of citing and cited entities, if any" )
+    arg_parser.add_argument( "-doi", "--doi_file", default=None,
+                             help="The file where the valid and invalid DOIs are stored." )
+    arg_parser.add_argument( "-date", "--date_file", default=None,
+                             help="The file that maps id of bibliographic resources with their publication date." )
+    arg_parser.add_argument( "-orcid", "--orcid_file", default=None,
+                             help="The file that maps id of bibliographic resources with the ORCID of its authors." )
+    arg_parser.add_argument( "-issn", "--issn_file", default=None,
+                             help="The file that maps id of bibliographic resources with the ISSN of the journal "
+                                  "they have been published in." )
+    arg_parser.add_argument( "-px", "--prefix", default="",
+                             help="The '0xxx0' prefix to use for creating the OCIs." )
+    arg_parser.add_argument( "-a", "--agent", required=True, default="https://w3id.org/oc/index/prov/pa/1",
+                             help="The URL of the agent providing or processing the citation data." )
+    arg_parser.add_argument( "-s", "--source", required=True,
+                             help="The URL of the source from where the citation data have been extracted." )
+    arg_parser.add_argument( "-sv", "--service", required=True,
+                             help="The name of the service that will made available the citation data." )
+    arg_parser.add_argument( "-v", "--verbose", action="store_true", default=False,
+                             help="Print the messages on screen." )
+    arg_parser.add_argument( "-na", "--no_api", action="store_true", default=False,
+                             help="Tell the tool explicitly not to use the APIs of the various finders." )
+    arg_parser.add_argument( "-pn", "--process_number", default=1, type=int,
+                             help="The number of parallel process to run for working on the creation of citations." )
+    arg_parser.add_argument( "-type", "--id_type", default=None,
+                             help="The type of the specified id, either doi or pmid." )
 
     args = arg_parser.parse_args()
-    n_processes = args.process_number
-    if n_processes <= 1:
-        new_citations_added, citations_already_present, error_in_dois_existence = \
-            execute_workflow(args.idbaseurl, args.baseurl, args.python, args.pclass, args.input, args.doi_file,
-                             args.date_file, args.orcid_file, args.issn_file, args.orcid, args.lookup, args.data,
-                             args.prefix, args.agent, args.source, args.service, args.verbose, args.no_api)
-    else:  # Run in parallel
-        pass  # TODO: do things
 
-    print("\n# Summary\n"
-          "Number of new citations added to the OpenCitations Index: %s\n"
-          "Number of citations already present in the OpenCitations Index: %s\n"
-          "Number of citations with invalid DOIs: %s" %
-          (new_citations_added, citations_already_present, error_in_dois_existence))
+    new_citations_added, citations_already_present, error_in_dois_existence = \
+        execute_workflow( args.idbaseurl, args.baseurl, args.pclass,
+                          args.input, args.doi_file, args.date_file, args.orcid_file,
+                          args.issn_file, args.orcid, args.lookup, args.data,
+                          args.prefix, args.agent, args.source, args.service,
+                          args.verbose, args.no_api, args.process_number, args.id_type)
+
+    print( "\n# Summary\n"
+           "Number of new citations added to the OpenCitations Index: %s\n"
+           "Number of citations already present in the OpenCitations Index: %s\n"
+           "Number of citations with invalid IDs: %s" %
+           (new_citations_added, citations_already_present, error_in_dois_existence) )
 
 # How to call the service (e.g. for COCI)
-# python -m index.cnc -ib "http://dx.doi.org/" -b "https://w3id.org/oc/index/coci/" -p "index/citation/citationsource.py" -c "CSVFileCitationSource" -i "index/test_data/citations_partial.csv" -doi "index/coci_test/doi.csv" -orcid "index/coci_test/orcid.csv" -date "index/coci_test/date.csv" -issn "index/coci_test/issn.csv" -l "index/test_data/lookup_full.csv" -d "index/coci_test" -px "020" -a "https://w3id.org/oc/index/prov/pa/1" -s "https://api.crossref.org/works/[[citing]]" -sv "OpenCitations Index: COCI" -v
+# python cnc.py -ib "http://dx.doi.org/" -b "https://w3id.org/oc/index/coci/" -c "csv" -i "index/test_data/citations_partial.csv" -doi "index/coci_test/doi.csv" -orcid "index/coci_test/orcid.csv" -date "index/coci_test/date.csv" -issn "index/coci_test/issn.csv" -l "index/test_data/lookup_full.csv" -d "index/coci_test" -px "020" -a "https://w3id.org/oc/index/prov/pa/1" -s "https://api.crossref.org/works/[[citing]]" -sv "OpenCitations Index: COCI" -type "doi" -v
+
+# How to call the service (e.g. for NOCI)
+# python cnc.py -ib "https://pubmed.ncbi.nlm.nih.gov/" -b "https://w3id.org/oc/index/noci/" -c "csv" -i "index/test_data/citations_partial_pmid.csv" -doi "index/noci_test/pmid.csv" -orcid "index/noci_test/orcid.csv" -date "index/noci_test/date.csv" -issn "index/noci_test/issn.csv" -l "index/test_data/lookup_full.csv" -d "index/noci_test" -px "0160" -a "https://w3id.org/oc/index/prov/ra/1" -s "https://doi.org/10.35092/yhjc.c.4586573.v16" -sv "OpenCitations Index: NOCI" -type "pmid" -v
