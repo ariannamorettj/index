@@ -68,7 +68,7 @@ class CitationSourceTest(unittest.TestCase):
                 "https://pubmed.ncbi.nlm.nih.gov/" + quote(cited), None,
                 created, timespan,
                 1, "https://w3id.org/oc/index/prov/ra/1",
-                "https://doi.org/10.35092/yhjc.c.4586573.v16" + quote(citing), "2018-01-01T00:00:00",
+                "https://doi.org/10.35092/yhjc.c.4586573.v16", "2018-01-01T00:00:00",
                 "OpenCitations Index: NOCI", "pmid", "https://pubmed.ncbi.nlm.nih.gov/([[XXX__decode]])", None,
                 journal_sc, author_sc, prov_description="Creation of the citation")
         else:

@@ -25,8 +25,7 @@ class PMIDManager( IdentifierManager ):
         super( PMIDManager, self ).__init__()
 
     def set_valid(self, id_string):
-        pmid = self.normalise( id_string, include_prefix=True )
-
+        pmid = self.normalise(id_string, include_prefix=True )
         if self.valid_pmid.get_value( pmid ) is None:
             self.valid_pmid.add_value( pmid, "v" )
 
@@ -43,6 +42,7 @@ class PMIDManager( IdentifierManager ):
             return "v" in self.valid_pmid.get_value( pmid )
 
     def normalise(self, id_string, include_prefix=False):
+        id_string = str(id_string)
         try:
             pmid_string = sub( "^0+", "", sub( "\0+", "", (sub( "[^\d+]", "", id_string )) ) )
             return "%s%s" % (self.p if include_prefix else "", pmid_string)

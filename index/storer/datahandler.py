@@ -41,10 +41,6 @@ class DataHandler(object):
     }
 
     def __init__(self, pclass, inp, lookup):
-        # print("pclass", pclass)
-        # print("inp", inp)
-        # print("lookup", lookup)
-        # print("_source_classes[pclass]", self._source_classes[pclass])
         self.cs = self._source_classes[pclass](inp)
         self.oci_manager = OCIManager(lookup_file=lookup)
 
@@ -119,22 +115,24 @@ class FileDataHandler(DataHandler):
 
         if id_type == OCIManager.doi_type:
             self.id_manager = DOIManager(valid_doi, use_api_service=not no_api)
+            crossref_rf = CrossrefResourceFinder(
+                date=id_date, orcid=id_orcid, issn=id_issn, doi=valid_doi, use_api_service=not no_api )
+            datacite_rf = DataCiteResourceFinder(
+                date=id_date, orcid=id_orcid, issn=id_issn, doi=valid_doi, use_api_service=not no_api )
+            orcid_rf = ORCIDResourceFinder(
+                date=id_date, orcid=id_orcid, issn=id_issn, doi=valid_doi,
+                use_api_service=True if orcid is not None and not no_api else False, key=orcid )
+            self.rf_handler = ResourceFinderHandler( [crossref_rf, datacite_rf, orcid_rf] )
+
+
         elif id_type == OCIManager.pmid_type:
             self.id_manager = PMIDManager(valid_doi, use_api_service=not no_api)
+            nih_rf = NIHResourceFinder(
+                date=id_date, orcid=id_orcid, issn=id_issn, pmid=valid_doi, use_api_service=not no_api )
+            self.rf_handler = ResourceFinderHandler( [nih_rf] )
+
         else:
             print("the id_type specified is not compliant")
-
-        crossref_rf = CrossrefResourceFinder(
-            date=id_date, orcid=id_orcid, issn=id_issn, doi=valid_doi, use_api_service=not no_api)
-        datacite_rf = DataCiteResourceFinder(
-            date=id_date, orcid=id_orcid, issn=id_issn, doi=valid_doi, use_api_service=not no_api)
-        orcid_rf = ORCIDResourceFinder(
-            date=id_date, orcid=id_orcid, issn=id_issn, doi=valid_doi,
-            use_api_service=True if orcid is not None and not no_api else False, key=orcid)
-        nih_rf = NIHResourceFinder(
-            date=id_date, orcid=id_orcid, issn=id_issn, pmid=valid_doi, use_api_service=not no_api)
-
-        self.rf_handler = ResourceFinderHandler([crossref_rf, datacite_rf, orcid_rf, nih_rf])
 
         self.exi_ocis = CSVManager.load_csv_column_as_set(
             data + sep + "data", "oci")
