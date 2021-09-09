@@ -148,6 +148,45 @@ def process(input_dir, output_dir):
                             orcid_norm = orcid_manager.normalise( orcid )
                             id_orcid.add_value(citing_pmid, orcid_norm)
 
+
+    #DA QUI DA SISTEMARE
+
+    # Do it again for updating the dates of the cited DOIs, if these are valid
+    print( "\n\n# Check cited DOIs from Crossref reference field" )
+    pmid_date = {} #creation of an empty set
+    for file_idx, file in enumerate( all_files, 1 ):
+        f = pd.read_csv(file)
+        print( "Open file %s of %s" % (file_idx, len_all_files) )
+        for index, row in f.iterrows():
+            cited_pmid = pmid_manager.normalise( row['pmid'], True )
+            if pmid_manager.is_valid(cited_pmid) and id_date.get_value(cited_pmid) is None:
+                if cited_pmid not in pmid_date:
+                    pmid_date[cited_pmid]=[]
+                cited_date = Citation.check_date(build_pubdate(row))
+                if cited_date is not None:
+                    pmid_date[cited_pmid].append(cited_date)
+                    if cited_pmid in citing_pmid_with_no_date:
+                        citing_pmid_with_no_date.remove(cited_pmid)
+
+    # Add the date to the PMID if such date is the most adopted one in the various references.
+    # In case two distinct dates are used the most, select the older one.
+    for pmid in pmid_date:
+        count = Counter( pmid_date[pmid] )
+        if len( count ):
+            top_value = count.most_common( 1 )[0][1]
+            selected_dates = []
+            for date in count:
+                if count[date] == top_value:
+                    selected_dates.append( date )
+            best_date = sorted( selected_dates )[0]
+            id_date.add_value(pmid, best_date )
+        else:
+            id_date.add_value(pmid, "" )
+
+    # Add emtpy dates for the remaining DOIs
+    for pmid in citing_pmid_with_no_date:
+        id_date.add_value( pmid, "" )
+
 if __name__ == "__main__":
     arg_parser = ArgumentParser( "Global files creator for NOCI",
                                  description="Process NIH CSV files and create global indexes to enable "
