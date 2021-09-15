@@ -25,24 +25,39 @@ from index.identifier.doimanager import DOIManager
 from index.identifier.issnmanager import ISSNManager
 from index.identifier.orcidmanager import ORCIDManager
 from os import sep, makedirs, walk
+import os
 from os.path import exists
 import csv
+import json
 from collections import Counter
 from re import sub
 from index.citation.oci import Citation
 from zipfile import ZipFile
 from tarfile import TarFile
 
+def issn_data_recover(directory):
+    journal_issn_dict = dict()
+    filename = directory + sep + 'journal_issn.json'
+    if not os.path.exists(filename):
+        return journal_issn_dict
+    else:
+        with open(filename, 'r', encoding='utf8') as fd:
+            journal_issn_dict = json.load(fd)
+            types = type(journal_issn_dict)
+            return journal_issn_dict
+
+def issn_data_to_cache(name_issn_dict, directory):
+    filename = directory + sep + 'journal_issn.json'
+    with open(filename, 'w', encoding='utf-8' ) as fd:
+            json.dump(name_issn_dict, fd, ensure_ascii=False, indent=4)
 
 #PUB DATE EXTRACTION : should take in input a data structure representing one publication
 def build_pubdate(row):
     year = str(row["year"])
     str_year = sub( "[^\d]", "", year)[:4]
     if str_year:
-        print("build_pubdate:", str_year)
         return str_year
     else:
-        print("build_pubdate:", None)
         return None
 
 
@@ -70,28 +85,24 @@ def get_all_files(i_dir):
                 if file.lower().endswith( ".csv" ) and "citations" not in file.lower() and "source" not in file.lower():
                     result.append(cur_dir + sep + file)
         opener = open
-        print( "The OPENER is:", opener )
-    print("it is returning:", result, opener) # ['index/test_data/nih_dump\\1.csv', 'index/test_data/nih_dump\\2.csv'] <built-in function open>
     return result, opener
 
 
-def process(input_dir, output_dir):
+def process(input_dir, output_dir, n):
     if not exists(output_dir):
         makedirs(output_dir)
 
     citing_pmid_with_no_date = set()
     valid_pmid = CSVManager( output_dir + sep + "valid_pmid.csv" )
     valid_doi = CSVManager("index/test_data/crossref_glob" + sep + "valid_doi.csv")
-    doi_pmid_mapping = CSVManager( output_dir + sep + "pmid_to_doi.csv" )
+    #doi_pmid_mapping = CSVManager( output_dir + sep + "pmid_to_doi.csv" )
     id_date = CSVManager( output_dir + sep + "id_date_pmid.csv" )
     id_issn = CSVManager( output_dir + sep + "id_issn_pmid.csv" )
     id_orcid = CSVManager( output_dir + sep + "id_orcid_pmid.csv" )
-
-    journal_name_issn = CSVManager( output_dir + sep + "journal_name_issn.csv" )
+    journal_issn_dict = issn_data_recover(output_dir) #just an empty dict in case the code never broke
     pmid_manager = PMIDManager(valid_pmid)
     crossref_resource_finder = CrossrefResourceFinder(valid_doi)
     orcid_resource_finder = ORCIDResourceFinder(valid_doi)
-
 
     doi_manager = DOIManager(valid_doi)
     issn_manager = ISSNManager()
@@ -103,87 +114,79 @@ def process(input_dir, output_dir):
     # Read all the CSV file in the NIH dump to create the main information of all the indexes
     print( "\n\n# Add valid PMIDs from NIH metadata" )
     for file_idx, file in enumerate( all_files, 1 ):
-        f = pd.read_csv(file)
-        print( "Open file %s of %s" % (file_idx, len_all_files) )
-        for index, row in f.iterrows():
-            citing_pmid = pmid_manager.normalise(row['pmid'], True)
-            pmid_manager.set_valid(citing_pmid)
-            citing_doi = doi_manager.normalise(row['doi'], True)
-            #doi_manager.set_valid(citing_doi)
+        df = pd.DataFrame()
+        for chunk in pd.read_csv(file, chunksize=1000 ):
+            f = pd.concat( [df, chunk], ignore_index=True )
 
-            if id_date.get_value(citing_pmid) is None:
-                citing_date = Citation.check_date(build_pubdate(row))
-                if citing_date is not None:
-                    id_date.add_value(citing_pmid, citing_date)
-                    if citing_pmid in citing_pmid_with_no_date:
-                        citing_pmid_with_no_date.remove(citing_pmid)
-                else:
-                    citing_pmid_with_no_date.add( citing_pmid )
+            print( "Open file %s of %s" % (file_idx, len_all_files) )
 
-            if id_issn.get_value( citing_pmid ) is None:
-                journal_name = row["journal"]
-                if journal_name_issn.get_value(journal_name) is not None:
-                    for issn in journal_name_issn.get_value(journal_name):
-                        id_issn.add_value( citing_pmid, issn )
-                else:
+            for index, row in f.iterrows():
+                if int(index) !=0 and int(index) % int(n) == 0:
+                    print( "Group nr.", int(index)//int(n), "processed. Data from", int(index), "rows saved to journal_issn.json mapping file")
+                    issn_data_to_cache(journal_issn_dict, output_dir)
+
+                citing_pmid = pmid_manager.normalise(row['pmid'], True)
+                pmid_manager.set_valid(citing_pmid)
+                citing_doi = doi_manager.normalise(row['doi'], True)
+                #doi_manager.set_valid(citing_doi)
+
+                if id_date.get_value(citing_pmid) is None:
+                    citing_date = Citation.check_date(build_pubdate(row))
+                    if citing_date is not None:
+                        id_date.add_value(citing_pmid, citing_date)
+                        if citing_pmid in citing_pmid_with_no_date:
+                            citing_pmid_with_no_date.remove(citing_pmid)
+                    else:
+                        citing_pmid_with_no_date.add( citing_pmid )
+
+                if id_issn.get_value( citing_pmid ) is None:
+                    journal_name = row["journal"]
+                    if journal_name: #check that the string is not empty
+                        if journal_name in journal_issn_dict.keys():
+                            for issn in journal_issn_dict[journal_name]:
+                                id_issn.add_value(citing_pmid, issn)
+                        else:
+                            if citing_doi is not None:
+                                json_res = crossref_resource_finder._call_api(citing_doi)
+                                if json_res is not None:
+                                    issn_set = crossref_resource_finder._get_issn(json_res)
+                                    if len(issn_set)>0:
+                                        journal_issn_dict[journal_name] = []
+                                    for issn in issn_set:
+                                        issn_norm = issn_manager.normalise(str(issn))
+                                        id_issn.add_value( citing_pmid, issn_norm )
+                                        journal_issn_dict[journal_name].append(issn_norm)
+
+
+                if id_orcid.get_value(citing_pmid) is None:
                     if citing_doi is not None:
-                        json_res = crossref_resource_finder._call_api(citing_doi)
+                        json_res = orcid_resource_finder._call_api(citing_doi)
                         if json_res is not None:
-                            issn_set = crossref_resource_finder._get_issn(json_res)
-                            print("issn_set", issn_set)
-                            issn_set_norm = set()
-                            for issn in issn_set:
-                                issn_norm = issn_manager.normalise( str( issn ) )
-                                id_issn.add_value( citing_pmid, issn_norm )
-                                issn_set_norm.add( issn_norm )
-                            if len( issn_set_norm ) > 0:
-                                journal_name_issn.add_value( journal_name, str( issn_set_norm ) )
-
-            if id_orcid.get_value(citing_pmid) is None:
-                if citing_doi is not None:
-                    json_res = orcid_resource_finder._call_api(citing_doi)
-                    if json_res is not None:
-                        orcid_set = orcid_resource_finder._get_orcid(json_res)
-                        for orcid in orcid_set:
-                            orcid_norm = orcid_manager.normalise( orcid )
-                            id_orcid.add_value(citing_pmid, orcid_norm)
+                            orcid_set = orcid_resource_finder._get_orcid(json_res)
+                            for orcid in orcid_set:
+                                orcid_norm = orcid_manager.normalise( orcid )
+                                id_orcid.add_value(citing_pmid, orcid_norm)
+            issn_data_to_cache( journal_issn_dict, output_dir )
 
 
-    #DA QUI DA SISTEMARE
-
-    # Do it again for updating the dates of the cited DOIs, if these are valid
-    print( "\n\n# Check cited DOIs from Crossref reference field" )
-    pmid_date = {} #creation of an empty set
+    # Iterate once again for all the rows of all the csv files, so to check the validity of the referenced pmids.
+    print( "\n\n# Checking the referenced pmids validity" )
     for file_idx, file in enumerate( all_files, 1 ):
-        f = pd.read_csv(file)
-        print( "Open file %s of %s" % (file_idx, len_all_files) )
-        for index, row in f.iterrows():
-            cited_pmid = pmid_manager.normalise( row['pmid'], True )
-            if pmid_manager.is_valid(cited_pmid) and id_date.get_value(cited_pmid) is None:
-                if cited_pmid not in pmid_date:
-                    pmid_date[cited_pmid]=[]
-                cited_date = Citation.check_date(build_pubdate(row))
-                if cited_date is not None:
-                    pmid_date[cited_pmid].append(cited_date)
-                    if cited_pmid in citing_pmid_with_no_date:
-                        citing_pmid_with_no_date.remove(cited_pmid)
+        df = pd.DataFrame()
+        for chunk in pd.read_csv( file, chunksize=1000 ):
+            f = pd.concat( [df, chunk], ignore_index=True )
+            print( "Open file %s of %s" % (file_idx, len_all_files) )
+            for index, row in f.iterrows():
+                if type(row["references"]) is str and row["references"] != "" and row["references"] != " ": #I had a problem with the "float" type with an empty string
+                    cited_pmids = set(row['references'].split(" "))
+                    for cited_pmid in cited_pmids:
+                        if pmid_manager.is_valid(cited_pmid) and valid_pmid.get_value(cited_pmid) is None:
+                            pmid_manager.set_valid(cited_pmid)
+                            print("valid cited pmid added:", cited_pmid)
+                        else:
+                            print("invalid cited pmid discarded:", cited_pmid)
 
-    # Add the date to the PMID if such date is the most adopted one in the various references.
-    # In case two distinct dates are used the most, select the older one.
-    for pmid in pmid_date:
-        count = Counter( pmid_date[pmid] )
-        if len( count ):
-            top_value = count.most_common( 1 )[0][1]
-            selected_dates = []
-            for date in count:
-                if count[date] == top_value:
-                    selected_dates.append( date )
-            best_date = sorted( selected_dates )[0]
-            id_date.add_value(pmid, best_date )
-        else:
-            id_date.add_value(pmid, "" )
-
-    # Add emtpy dates for the remaining DOIs
+    #Check if it is correct to do it also in this case
     for pmid in citing_pmid_with_no_date:
         id_date.add_value( pmid, "" )
 
@@ -197,8 +200,14 @@ if __name__ == "__main__":
     arg_parser.add_argument( "-o", "--output_dir", dest="output_dir", required=True,
                              help="The directory where the indexes are stored." )
 
+
+    arg_parser.add_argument( "-n", "--num_lines", dest="n", required=True,
+                             help="Number of lines after which the data stored in the dictionary for the mapping "
+                                  "between a Journal name and the related issns are passed into a JSON cache file" )
+
+
     args = arg_parser.parse_args()
-    process(args.input_dir, args.output_dir)
+    process(args.input_dir, args.output_dir, args.n)
 
 
-#python -m index.noci.glob1 -i "index/test_data/nih_dump" -o "index/test_data/nih_glob1"
+#python -m index.noci.glob1 -i "index/test_data/nih_dump" -o "index/test_data/nih_glob1" -n 20
