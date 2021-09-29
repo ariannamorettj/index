@@ -34,6 +34,7 @@ from re import sub
 from index.citation.oci import Citation
 from zipfile import ZipFile
 from tarfile import TarFile
+import re
 
 def issn_data_recover(directory):
     journal_issn_dict = dict()
@@ -177,14 +178,19 @@ def process(input_dir, output_dir, n):
             f = pd.concat( [df, chunk], ignore_index=True )
             print( "Open file %s of %s" % (file_idx, len_all_files) )
             for index, row in f.iterrows():
-                if type(row["references"]) is str and row["references"] != "" and row["references"] != " ": #I had a problem with the "float" type with an empty string
-                    cited_pmids = set(row['references'].split(" "))
-                    for cited_pmid in cited_pmids:
-                        if pmid_manager.is_valid(cited_pmid) and valid_pmid.get_value(cited_pmid) is None:
-                            pmid_manager.set_valid(cited_pmid)
-                            print("valid cited pmid added:", cited_pmid)
-                        else:
-                            print("invalid cited pmid discarded:", cited_pmid)
+                if type(row["references"]) is str and row["references"] != "":
+                    ref_string = row["references"].strip()
+                    ref_string_norm = re.sub("\s\s+", " ", ref_string)
+                else:
+                    print("the type of row reference is", type(row["references"]))
+
+                cited_pmids = set(ref_string_norm.split(" "))
+                for cited_pmid in cited_pmids:
+                    if pmid_manager.is_valid(cited_pmid):
+                        pmid_manager.set_valid(cited_pmid) #is it necessary?
+                        print("valid cited pmid added:", cited_pmid)
+                    else:
+                        print("invalid cited pmid discarded:", cited_pmid)
 
     #Check if it is correct to do it also in this case
     for pmid in citing_pmid_with_no_date:
