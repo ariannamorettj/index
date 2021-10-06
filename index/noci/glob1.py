@@ -180,14 +180,14 @@ def process(input_dir, output_dir, n):
             for index, row in f.iterrows():
                 if type(row["references"]) is str and row["references"] != "":
                     ref_string = row["references"].strip()
-                    ref_string_norm = re.sub("\s\s+", " ", ref_string)
+                    ref_string_norm = re.sub("\s+", " ", ref_string)
                 else:
-                    print("the type of row reference is", type(row["references"]))
+                    print("the type of row reference is", (row["references"]), type(row["references"]))
+                    print(index, row )
 
                 cited_pmids = set(ref_string_norm.split(" "))
                 for cited_pmid in cited_pmids:
                     if pmid_manager.is_valid(cited_pmid):
-                        pmid_manager.set_valid(cited_pmid) #is it necessary?
                         print("valid cited pmid added:", cited_pmid)
                     else:
                         print("invalid cited pmid discarded:", cited_pmid)

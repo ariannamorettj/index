@@ -18,6 +18,9 @@ from csv import DictReader
 from io import StringIO
 from os.path import exists, isdir
 from os import walk, sep
+import csv
+from tempfile import NamedTemporaryFile
+import shutil
 
 
 class CSVManager(object):
@@ -110,6 +113,27 @@ class CSVManager(object):
                 with open(self.csv_path, "a", encoding="utf8") as f:
                     f.write('"%s","%s"\n' % (id_string.replace('"', '""'),
                                              value.replace('"', '""')))
+
+
+    def substitute_value(self, id_string, value):
+        """Substitute the value of a csv line if the value associated with the id is not the expected one"""
+        if id_string in self.data and str( value ) not in self.data[id_string]:
+            self.data[id_string].clear()
+            self.data[id_string].add( str( value ) )
+            filename = self.csv_path
+            tempfile = NamedTemporaryFile(mode='w', newline='', delete=False)
+            fields = ["id", "value"]
+            with open( filename, 'r', encoding="utf8", newline='') as csvfile, tempfile:
+                reader = csv.DictReader(csvfile, fieldnames=fields)
+                writer = csv.DictWriter(tempfile, fieldnames=fields)
+                for row in reader:
+                    if row["id"] == id_string and str(value) != row["value"]:
+                        print( 'updating row', row['id'] )
+                        row["id"], row["value"] = id_string, str(value)
+                    row = {"id": row["id"], "value": row["value"]}
+                    writer.writerow(row)
+            shutil.move( tempfile.name, filename )
+
 
     def __load_csv(self, csv_string):
         csv_metadata = DictReader(StringIO(csv_string), delimiter=',')
