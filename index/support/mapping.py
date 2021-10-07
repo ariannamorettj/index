@@ -1,16 +1,3 @@
-#prende un cnc, il mio csv coi mapping definiti, dà in output il csv con il mapping aggiornato e l'rdf solo con i dati nuovi.
-#qui una classe che estende mapping (classe) in modo da potergli passare l'input in più che estende la classe e che mi va a generare
-#il file di mapping.
-#l'identificativo va passato come input per capire quali files di mapping considerare e quali no
-#per la selezione o l'utente passa i files di mapping (che devono essere fatti in un certo modo) o li selezioni con il nome.
-#il file di mapping crealo come vuoi, è ragionevole utilizzare csv manager, l'importante è occupare poco spazio. forse la cosa più
-#safe è che ci fosse un prefisso per ogni riga, così da mantenere la struttura coerente per tutti i files.
-#passa in input anche il tipo
-#in input serve anche il numero dell'utimo metaid creato
-#fai in modo di generare il rdf solo alla fine, prendendo nota inizialmente del numero di righe del csv in input per capire da quale riga in poi creare l'rdf
-#i file di mapping puoi considerare solo quelli che hanni i prefissi che ti interessano
-#è importante che tutti i file di mapping contengano l'informazione del tipo di id.
-
 import pandas as pd
 from argparse import ArgumentParser
 from index.storer.csvmanager import CSVManager
