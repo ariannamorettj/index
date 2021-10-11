@@ -116,11 +116,12 @@ def process(input_dir, output_dir, n):
     print( "\n\n# Add valid PMIDs from NIH metadata" )
     for file_idx, file in enumerate( all_files, 1 ):
         df = pd.DataFrame()
+
         for chunk in pd.read_csv(file, chunksize=1000 ):
             f = pd.concat( [df, chunk], ignore_index=True )
+            f.fillna("", inplace=True)
 
             print( "Open file %s of %s" % (file_idx, len_all_files) )
-
             for index, row in f.iterrows():
                 if int(index) !=0 and int(index) % int(n) == 0:
                     print( "Group nr.", int(index)//int(n), "processed. Data from", int(index), "rows saved to journal_issn.json mapping file")
@@ -174,11 +175,13 @@ def process(input_dir, output_dir, n):
     print( "\n\n# Checking the referenced pmids validity" )
     for file_idx, file in enumerate( all_files, 1 ):
         df = pd.DataFrame()
+
         for chunk in pd.read_csv( file, chunksize=1000 ):
             f = pd.concat( [df, chunk], ignore_index=True )
+            f.fillna("", inplace=True)
             print( "Open file %s of %s" % (file_idx, len_all_files) )
             for index, row in f.iterrows():
-                if type(row["references"]) is str and row["references"] != "":
+                if row["references"] != "":
                     ref_string = row["references"].strip()
                     ref_string_norm = re.sub("\s+", " ", ref_string)
                 else:
