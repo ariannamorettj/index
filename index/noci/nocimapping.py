@@ -7,6 +7,7 @@ from os import sep, makedirs, walk
 from os.path import exists
 from zipfile import ZipFile
 from tarfile import TarFile
+from datetime import datetime
 
 def get_all_files(i_dir):
     result = []
@@ -37,12 +38,13 @@ def process(input_dir, output_dir):
     if not exists(output_dir):
         makedirs(output_dir)
 
-    mapping_folder = output_dir + "/mapping"
+    mapping_folder = output_dir + "/NIH_mapping"
     if not exists(mapping_folder):
         makedirs(mapping_folder)
 
-    pmid_doi_mapping = CSVManager(mapping_folder + sep + "pmid_doi_mapping.csv" )
-    valid_pmid = CSVManager(output_dir + sep + "valid_pmid.csv")
+    cur_date = datetime.today().strftime( '%Y-%m-%d' )
+    pmid_doi_mapping = CSVManager(mapping_folder + sep + "pmid_doi_mapping_"+ cur_date + ".csv" )
+    valid_pmid = CSVManager("index/test_data/nih_glob1" + sep + "valid_pmid.csv")
     valid_doi = CSVManager("index/test_data/crossref_glob" + sep + "valid_doi.csv")
     pmid_manager = PMIDManager(valid_pmid)
     doi_manager = DOIManager(valid_doi)
@@ -81,6 +83,6 @@ if __name__ == "__main__":
     process(args.input_dir, args.output_dir)
 
 
-#python -m index.noci.nocimapping -i "index/test_data/nih_dump" -o "index/test_data/nih_glob1"
+#python -m index.noci.nocimapping -i "index/test_data/nih_dump" -o "index/mapping_global"
 
 

@@ -24,7 +24,6 @@ from os.path import basename
 
 from SPARQLWrapper import SPARQLWrapper
 
-
 def add(server, g_url, f_n, date_str, type_file):
     server = SPARQLWrapper(server)
     server.method = 'POST'
