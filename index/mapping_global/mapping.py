@@ -12,6 +12,7 @@ from rdflib import Graph, URIRef
 from rdflib.namespace import DCTERMS
 from csv import reader
 from datetime import datetime
+import random
 
 #Access all input file needed, contained in a specified directory
 def get_all_files(i_dir):
@@ -38,22 +39,30 @@ def get_all_files(i_dir):
         opener = open
     return result, opener
 
-#Create a nt file from a csv
-def create_rdf_from_csv(csvfile):
+#Create a nt files from a csv files
+def create_rdf_from_csv(csvfile_add, csvfile_delete):
     g = Graph()
+    gdel = Graph()
 
     #Set prefixes for DOIs, PMIDs and METAIDs, and store in a variable the only preicate which will be used
     doi_uri_pref = "http://dx.doi.org/"
     pmid_uri_pref = "https://pubmed.ncbi.nlm.nih.gov/"
     metaid_uri_pref = "https://w3id.org/oc/meta/br/060"
     predicate = DCTERMS.relation
+    cur_date = datetime.today().strftime( '%Y-%m-%d' )
 
     #Read the csv file skipping the header line
-    with open(csvfile , 'r' ) as read_obj:
-        csv_reader = reader( read_obj )
-        next(csv_reader)
-        for row in csv_reader:
-            if row:
+    with open(csvfile_delete, 'r' ) as deletefile:
+        del_existing_lines = [line for line in reader(deletefile, delimiter=',' )]
+
+    discarded_rows = []
+    with open(csvfile_add, 'r' ) as addfile:
+        reader_addfile = reader( addfile, delimiter=',' )
+        #next(reader_addfile)
+        for row in reader_addfile:
+            if row in del_existing_lines:
+                discarded_rows.append(row)
+            elif row:
                 # store in the id variable the identifier (doi or pmid) without its prefix, and use it in the id's URI
                 id = row[0].strip()
                 if id.startswith("pmid:"):
@@ -61,21 +70,45 @@ def create_rdf_from_csv(csvfile):
                 elif id.startswith("doi:"):
                     id_uri =URIRef(doi_uri_pref+id[4:])
                 metaid_uri = URIRef(metaid_uri_pref+row[1])
-
                 #Add the triple to the graph
                 if id_uri and metaid_uri:
                     g.add((id_uri, predicate, metaid_uri))
+                    print("added triple:", id_uri, predicate, metaid_uri)
 
-    #Save the graph in a file containing the date of creation and the name of the original csv file
-    cur_date = datetime.today().strftime('%Y-%m-%d')
-    if csvfile.endswith('.csv'):
-        match = re.search(".+?(?=.csv)", csvfile)
+        #Save the additiob graph in a file containing the date of creation and the name of the original csv file
+        if csvfile_add.endswith('.csv'):
+            match = re.search(".+?(?=.csv)", csvfile_add)
+            if match:
+                filename = match.group(0)
+        else:
+            filename = csvfile_add
+        rdf_filename = filename + "_" + cur_date + ".nt"
+        g.serialize(destination= rdf_filename, format='nt')
+
+    for row in del_existing_lines:
+        if row and row not in discarded_rows:
+            # store in the id variable the identifier (doi or pmid) without its prefix, and use it in the id's URI
+            id = row[0].strip()
+            if id.startswith( "pmid:" ):
+                id_uri = URIRef( pmid_uri_pref + id[5:] )
+            elif id.startswith( "doi:" ):
+                id_uri = URIRef( doi_uri_pref + id[4:] )
+            metaid_uri = URIRef( metaid_uri_pref + row[1] )
+            # Add the triple to the graph
+            if id_uri and metaid_uri:
+                gdel.add( (id_uri, predicate, metaid_uri) )
+                print( "added triple to delete file:", id_uri, predicate, metaid_uri )
+
+    # Save the deletion graph in a file containing the date of creation and the name of the original csv file
+    if csvfile_delete.endswith( '.csv' ):
+        match = re.search( ".+?(?=.csv)", csvfile_delete )
         if match:
-            filename = match.group(0)
+            filename = match.group( 0 )
     else:
-        filename = csvfile
+        filename = csvfile_delete
     rdf_filename = filename + "_" + cur_date + ".nt"
-    g.serialize(destination= rdf_filename, format='nt')
+    gdel.serialize( destination=rdf_filename, format='nt' )
+
 
 """
 process is the main function. It takes in input:
@@ -172,7 +205,18 @@ def process(input_dir1, input_dir2, midmcsv, canc_to_new_csv, last_metaid, outpu
                     id_type = "doi"
 
                 citing = id_type + ":" + str(row["citing"])
+                if metaid_mapping.get_value(citing):
+                    pass_citing = True
+                else:
+                    pass_citing = False
+
                 cited = id_type + ":" + str(row["cited"])
+                if metaid_mapping.get_value(cited):
+                    pass_cited = True
+                else:
+                    pass_cited = False
+
+                print("Processing citation:", citing, cited)
                 same_id_as = set()
                 same_id_as_cited = set()
 
@@ -189,15 +233,15 @@ def process(input_dir1, input_dir2, midmcsv, canc_to_new_csv, last_metaid, outpu
                                     same_id_as.add(row["id"])
                                     same_id_as.add(row["value"])
                                 else:
-                                    print("No matched ids found for:", citing)
+                                    print("No multiple ids found for:", citing)
 
                                 #check presence of multiple ids for the same publication (cited)
-                                if cited in row["id"] or citing in row["value"]:
+                                if cited in row["id"] or cited in row["value"]:
                                     print("Multiple ids for same publication found")
                                     same_id_as_cited.add(row["id"])
                                     same_id_as_cited.add(row["value"])
                                 else:
-                                    print("No matched ids found for:", cited)
+                                    print("No multiple ids found for:", cited)
 
                             if len(same_id_as) == 0:
                                 same_id_as.add(citing)
@@ -208,156 +252,225 @@ def process(input_dir1, input_dir2, midmcsv, canc_to_new_csv, last_metaid, outpu
                     same_id_as.add(citing)
                     same_id_as_cited.add(cited)
 
-                #to collect metaids previously assigned to multiple correspondant ids for the same publication
-                previous_metaids = set()
-                previous_metaids_cited = set()
-
-                for id in same_id_as:
-                    assigned_metaid = metaid_mapping.get_value(id)
-                    if assigned_metaid is not None:
-                        for id in assigned_metaid:
-                            assigned_metaid.remove(id)
-                            assigned_metaid.add(int(id))
-                        previous_metaids.update(assigned_metaid)
-
-                for idcited in same_id_as_cited:
-                    assigned_metaid_cited = metaid_mapping.get_value(idcited)
-                    if assigned_metaid_cited is not None:
-                        for idcited in assigned_metaid_cited:
-                            assigned_metaid_cited.remove(idcited)
-                            assigned_metaid_cited.add(int(idcited))
-                        previous_metaids_cited.update(assigned_metaid_cited)
-
-                #Case1: only one metaid was assigned to one of the correspondant ids for the same publication: all
-                # the other ids for the same publication must be assigned the same metaid.
-                if len(previous_metaids) == 1:
-                    metaid = str(list(previous_metaids)[0])
-                    for id in same_id_as:
-                        if metaid_mapping.get_value(id) is None:
-                            metaid_mapping.add_value(id, metaid)
-                            new_mappings_csv.add_value(id, metaid)
-                        elif metaid_mapping.get_value(id) is not None and metaid not in metaid_mapping.get_value(id):
-                            for val in metaid_mapping.get_value(id):
-                                canc_to_new_mapping.add_value(val, metaid)
-                                deleted_mappings_csv.add_value(id, val)
-                            metaid_mapping.substitute_value(id, metaid)
-                            new_mappings_csv.add_value(id, metaid)
-
-                # Case2: more metaids were assigned to correspondant ids for the same publication: all
-                # the ids for the same publication must be assigned/reassigned the same metaid, which is the lowest
-                # among the assigned ones. The other metaids are invalidated.
-                elif len(previous_metaids) > 1:
-                    metaid = min(previous_metaids)
-                    previous_metaids.remove(metaid)
-                    for prev_metaid in previous_metaids:
-                        canc_to_new_mapping.add_value(str(prev_metaid), str(metaid))
-
-                    metaid = str(metaid)
-
-                    for id in same_id_as:
-                        if metaid_mapping.get_value(id) is None:
-                            metaid_mapping.add_value(id, metaid)
-                            new_mappings_csv.add_value(id, metaid)
-                        elif metaid_mapping.get_value(id) is not None and metaid not in metaid_mapping.get_value(id):
-                            for val in metaid_mapping.get_value(id):
-                                canc_to_new_mapping.add_value(val, metaid)
-                                deleted_mappings_csv.add_value(id, val)
-                            metaid_mapping.substitute_value(id, metaid)
-                            new_mappings_csv.add_value(id, metaid)
-
-                # Case3: No metaid found for correspondant ids for the same publication. A new metaid is assigned.
-
+                casual_id = random.sample(same_id_as,1)
+                casual_value = metaid_mapping.get_value((casual_id)[0])
+                if pass_citing and len(same_id_as) == 1:
+                    pass
+                elif len(same_id_as)>1 and all(metaid_mapping.get_value(i) == casual_value for i in same_id_as):
+                    pass
                 else:
-                    metaid = str(next_metaid)
-                    next_metaid +=1
-                    with open( last_metaid, "r" ) as l_mid:
-                        data = l_mid.read()
-                        prefix = "https://w3id.org/oc/meta/br/060"
-                        len_prefix = len(prefix)
-                        match = re.search('(\d+)', data[len_prefix:])
-                        if match:
-                            ret = prefix + (re.sub(match.group(0), metaid, data[len_prefix:]))
-                    with open(last_metaid, "w") as l_mid:
-                        l_mid.write(ret)
-
+                    #to collect metaids previously assigned to multiple correspondant ids for the same publication
+                    previous_metaids = set()
                     for id in same_id_as:
-                        if metaid_mapping.get_value(id) is None:
-                            metaid_mapping.add_value(id, metaid)
-                            new_mappings_csv.add_value(id, metaid)
-                        elif metaid_mapping.get_value(id) is not None and metaid not in metaid_mapping.get_value(id):
-                            for val in metaid_mapping.get_value(id):
-                                canc_to_new_mapping.add_value(val, metaid)
-                                deleted_mappings_csv.add_value(id, val)
-                            metaid_mapping.substitute_value(id, metaid)
-                            new_mappings_csv.add_value(id, metaid)
+                        assigned_metaid = metaid_mapping.get_value(id)
+                        if assigned_metaid is not None:
+                            for id in assigned_metaid:
+                                #verify the type of the id
+                                assigned_metaid.remove(id)
+                                assigned_metaid.add(int(id))
+                            previous_metaids.update(assigned_metaid)
 
-                #The whole process is repeated for cited ids from cnc output
+                    # Case1: only one metaid was assigned to one of the correspondant ids for the same publication: all
+                    # the other ids for the same publication must be assigned the same metaid.
+                    if len( previous_metaids ) == 1:
+                        metaid = str( list( previous_metaids )[0] )
+                        for id in same_id_as:
+                            print( "id:", id )
+                            if metaid_mapping.get_value( id ) is None:
+                                metaid_mapping.add_value( id, metaid )
+                                new_mappings_csv.add_value( id, metaid )
 
-                # Case1: only one metaid was assigned to one of the correspondant ids for the same publication: all
-                # the other ids for the same publication must be assigned the same metaid.
-                if len(previous_metaids_cited) == 1:
-                    metaid = str( list(previous_metaids_cited)[0] )
-                    for id_cited in same_id_as_cited:
-                        if metaid_mapping.get_value( id_cited ) is None:
-                            metaid_mapping.add_value( id_cited, metaid )
-                            new_mappings_csv.add_value( id_cited, metaid )
-                        elif metaid_mapping.get_value( id_cited ) is not None and metaid not in metaid_mapping.get_value(id_cited):
-                            for val in metaid_mapping.get_value(id_cited):
-                                canc_to_new_mapping.add_value( val, metaid )
-                                deleted_mappings_csv.add_value( id_cited, val )
-                            metaid_mapping.substitute_value(id_cited, metaid)
-                            new_mappings_csv.add_value(id_cited, metaid )
+                            elif metaid_mapping.get_value(
+                                    id ) is not None and metaid not in metaid_mapping.get_value( id ):
 
-                # Case2: more metaids were assigned to correspondant ids for the same publication: all
-                # the ids for the same publication must be assigned/reassigned the same metaid, which is the lowest
-                # among the assigned ones. The other metaids are invalidated.
-                elif len(previous_metaids_cited) > 1:
-                    metaid = min(previous_metaids_cited)
-                    previous_metaids_cited.remove( metaid )
-                    for prev_metaid in previous_metaids_cited:
-                        canc_to_new_mapping.add_value(str(prev_metaid), str(metaid))
+                                for val in metaid_mapping.get_value( id ):
+                                    canc_to_new_mapping.add_value( val, metaid )
+                                    deleted_mappings_csv.add_value( id, val )
+                                metaid_mapping.substitute_value( id, metaid )
+                                new_mappings_csv.add_value( id, metaid )
 
-                    metaid = str(metaid)
+                            else:
 
-                    for id_cited in same_id_as_cited:
-                        if metaid_mapping.get_value( id_cited ) is None:
-                            metaid_mapping.add_value( id_cited, metaid )
-                            new_mappings_csv.add_value(id_cited, metaid )
-                        elif metaid_mapping.get_value( id_cited ) is not None and metaid not in metaid_mapping.get_value(id_cited):
-                            for val in metaid_mapping.get_value(id_cited):
-                                canc_to_new_mapping.add_value( val, metaid )
-                                deleted_mappings_csv.add_value(id_cited, val)
-                            metaid_mapping.substitute_value(id_cited, metaid )
-                            new_mappings_csv.add_value( id_cited, metaid )
+                                for val in metaid_mapping.get_value( id ):
+                                    if val != metaid:
+                                        canc_to_new_mapping.add_value( val, metaid )
+                                        deleted_mappings_csv.add_value( id, val )
+                                if metaid_mapping.get_value( id ) != {metaid}:
+                                    metaid_mapping.substitute_value( id, metaid )
+                                    new_mappings_csv.add_value( id, metaid )
 
-                # Case3: No metaid found for correspondant ids for the same publication. A new metaid is assigned.
 
+                    # Case2: more metaids were assigned to correspondant ids for the same publication: all
+                    # the ids for the same publication must be assigned/reassigned the same metaid, which is the lowest
+                    # among the assigned ones. The other metaids are invalidated.
+                    elif len( previous_metaids ) > 1:
+                        metaid = min( previous_metaids )
+                        previous_metaids.remove( metaid )
+                        metaid = str( metaid )
+
+                        for id in same_id_as:
+                            if metaid_mapping.get_value( id ) is None:
+                                metaid_mapping.add_value( id, metaid )
+                                new_mappings_csv.add_value( id, metaid )
+
+                            elif metaid_mapping.get_value(id ) is not None and metaid not in metaid_mapping.get_value( id ):
+
+                                for val in metaid_mapping.get_value( id ):
+                                    canc_to_new_mapping.add_value( val, metaid )
+                                    deleted_mappings_csv.add_value( id, val )
+                                metaid_mapping.substitute_value( id, metaid )
+                                new_mappings_csv.add_value( id, metaid )
+
+                            else:
+                                for val in metaid_mapping.get_value( id ):
+                                    if val != metaid:
+                                        canc_to_new_mapping.add_value( val, metaid )
+                                        deleted_mappings_csv.add_value( id, val )
+                                if metaid_mapping.get_value( id ) != {metaid}:
+                                    metaid_mapping.substitute_value( id, metaid )
+                                    new_mappings_csv.add_value( id, metaid )
+
+                    # Case3: No metaid found for correspondant ids for the same publication. A new metaid is assigned.
+
+                    else:
+                        metaid = str( next_metaid )
+                        next_metaid += 1
+                        with open( last_metaid, "r" ) as l_mid:
+                            data = l_mid.read()
+                            prefix = "https://w3id.org/oc/meta/br/060"
+                            len_prefix = len( prefix )
+                            match = re.search( '(\d+)', data[len_prefix:] )
+                            if match:
+                                ret = prefix + (re.sub( match.group( 0 ), metaid, data[len_prefix:] ))
+                        with open( last_metaid, "w" ) as l_mid:
+                            l_mid.write( ret )
+
+                        for id in same_id_as:
+                            if metaid_mapping.get_value( id ) is None:
+                                metaid_mapping.add_value( id, metaid )
+                                new_mappings_csv.add_value( id, metaid )
+
+                            elif metaid_mapping.get_value(id ) is not None and metaid not in metaid_mapping.get_value( id ):
+
+                                for val in metaid_mapping.get_value( id ):
+                                    canc_to_new_mapping.add_value( val, metaid )
+                                    deleted_mappings_csv.add_value( id, val )
+                                metaid_mapping.substitute_value( id, metaid )
+                                new_mappings_csv.add_value( id, metaid )
+                            else:
+                                for val in metaid_mapping.get_value( id ):
+                                    if val != metaid:
+                                        canc_to_new_mapping.add_value( val, metaid )
+                                        deleted_mappings_csv.add_value( id, val )
+                                if metaid_mapping.get_value( id ) != {metaid}:
+                                    metaid_mapping.substitute_value( id, metaid )
+                                    new_mappings_csv.add_value( id, metaid )
+
+                casual_id_cited = random.sample(same_id_as_cited,1)
+                casual_value = metaid_mapping.get_value((casual_id_cited)[0])
+
+                if pass_cited and len(same_id_as_cited) == 1:
+                    pass
+                elif len(same_id_as_cited)>1 and all(metaid_mapping.get_value(i) == casual_value for i in same_id_as_cited):
+                    pass
                 else:
-                    metaid = str( next_metaid )
-                    next_metaid += 1
-                    with open( last_metaid, "r" ) as l_mid:
-                        data = l_mid.read()
-                        prefix = "https://w3id.org/oc/meta/br/060"
-                        len_prefix = len( prefix )
-                        match = re.search( '(\d+)', data[len_prefix:] )
-                        if match:
-                            ret = prefix + (re.sub( match.group( 0 ), metaid, data[len_prefix:] ))
-
-                    for id_cited in same_id_as_cited:
-                        if metaid_mapping.get_value(id_cited) is None:
-                            metaid_mapping.add_value(id_cited, metaid )
-                            new_mappings_csv.add_value(id_cited, metaid )
-                        elif metaid_mapping.get_value(id_cited) is not None and metaid not in metaid_mapping.get_value(id_cited):
-                            for val in metaid_mapping.get_value(id_cited):
-                                canc_to_new_mapping.add_value( val, metaid )
-                                deleted_mappings_csv.add_value(id_cited, val)
-                            metaid_mapping.substitute_value(id_cited, metaid )
-                            new_mappings_csv.add_value(id_cited, metaid)
+                    previous_metaids_cited = set()
+                    for idcited in same_id_as_cited:
+                        assigned_metaid_cited = metaid_mapping.get_value(idcited)
+                        if assigned_metaid_cited is not None:
+                            for idcited in assigned_metaid_cited:
+                                assigned_metaid_cited.remove(idcited)
+                                assigned_metaid_cited.add(int(idcited))
+                            previous_metaids_cited.update(assigned_metaid_cited)
 
 
-    create_rdf_from_csv(new_mappings)
+                    #The whole process is repeated for cited ids from cnc output
+
+                    # Case1: only one metaid was assigned to one of the correspondant ids for the same publication: all
+                    # the other ids for the same publication must be assigned the same metaid.
+                    if len(previous_metaids_cited) == 1:
+                        metaid = str(list(previous_metaids_cited)[0])
+                        for id_cited in same_id_as_cited:
+                            if metaid_mapping.get_value(id_cited) is None:
+                                metaid_mapping.add_value( id_cited, metaid )
+                                new_mappings_csv.add_value( id_cited, metaid )
+                            elif metaid_mapping.get_value( id_cited ) is not None and metaid not in metaid_mapping.get_value(id_cited):
+                                for val in metaid_mapping.get_value(id_cited):
+                                    canc_to_new_mapping.add_value( val, metaid )
+                                    deleted_mappings_csv.add_value( id_cited, val )
+                                metaid_mapping.substitute_value(id_cited, metaid)
+                                new_mappings_csv.add_value(id_cited, metaid )
+                            else:
+                                for val in metaid_mapping.get_value( id_cited ):
+                                    if val != metaid:
+                                        canc_to_new_mapping.add_value( val, metaid )
+                                        deleted_mappings_csv.add_value(id_cited, val)
+                                if metaid_mapping.get_value(id_cited) != {metaid}:
+                                    metaid_mapping.substitute_value(id_cited, metaid)
+                                    new_mappings_csv.add_value(id_cited, metaid )
+
+                    # Case2: more metaids were assigned to correspondant ids for the same publication: all
+                    # the ids for the same publication must be assigned/reassigned the same metaid, which is the lowest
+                    # among the assigned ones. The other metaids are invalidated.
+                    elif len(previous_metaids_cited) > 1:
+                        metaid = min(previous_metaids_cited)
+                        previous_metaids_cited.remove( metaid )
+                        metaid = str(metaid)
+
+                        for id_cited in same_id_as_cited:
+                            if metaid_mapping.get_value( id_cited ) is None:
+                                metaid_mapping.add_value( id_cited, metaid )
+                                new_mappings_csv.add_value(id_cited, metaid )
+                            elif metaid_mapping.get_value( id_cited ) is not None and metaid not in metaid_mapping.get_value(id_cited):
+                                for val in metaid_mapping.get_value(id_cited):
+                                    canc_to_new_mapping.add_value( val, metaid )
+                                    deleted_mappings_csv.add_value(id_cited, val)
+                                metaid_mapping.substitute_value(id_cited, metaid )
+                                new_mappings_csv.add_value( id_cited, metaid )
+                            else:
+                                for val in metaid_mapping.get_value( id_cited ):
+                                    if val != metaid:
+                                        canc_to_new_mapping.add_value( val, metaid )
+                                        deleted_mappings_csv.add_value( id_cited, val )
+                                if metaid_mapping.get_value(id_cited) != {metaid}:
+                                    metaid_mapping.substitute_value( id_cited, metaid )
+                                    new_mappings_csv.add_value( id_cited, metaid )
+
+                    # Case3: No metaid found for correspondant ids for the same publication. A new metaid is assigned.
+                    else:
+                        metaid = str( next_metaid )
+                        next_metaid += 1
+                        with open( last_metaid, "r" ) as l_mid:
+                            data = l_mid.read()
+                            prefix = "https://w3id.org/oc/meta/br/060"
+                            len_prefix = len(prefix)
+                            match = re.search( '(\d+)', data[len_prefix:] )
+                            if match:
+                                ret = prefix + (re.sub( match.group( 0 ), metaid, data[len_prefix:] ))
+                        with open(last_metaid, "w") as l_mid:
+                            l_mid.write(ret)
+
+                        for id_cited in same_id_as_cited:
+                            if metaid_mapping.get_value(id_cited) is None:
+                                metaid_mapping.add_value(id_cited, metaid )
+                                new_mappings_csv.add_value(id_cited, metaid )
+                            elif metaid_mapping.get_value(id_cited) is not None and metaid not in metaid_mapping.get_value(id_cited):
+                                for val in metaid_mapping.get_value(id_cited):
+                                    canc_to_new_mapping.add_value( val, metaid )
+                                    deleted_mappings_csv.add_value(id_cited, val)
+                                metaid_mapping.substitute_value(id_cited, metaid )
+                                new_mappings_csv.add_value(id_cited, metaid)
+                            else:
+                                for val in metaid_mapping.get_value( id_cited ):
+                                    if val != metaid:
+                                        canc_to_new_mapping.add_value( val, metaid )
+                                        deleted_mappings_csv.add_value( id_cited, val )
+                                if metaid_mapping.get_value(id_cited) != {metaid}:
+                                    metaid_mapping.substitute_value( id_cited, metaid )
+                                    new_mappings_csv.add_value( id_cited, metaid )
+
+    create_rdf_from_csv(new_mappings, deleted_mappings)
     os.remove(new_mappings)
-    create_rdf_from_csv(deleted_mappings)
     os.remove(deleted_mappings)
 
 
