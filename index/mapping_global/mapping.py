@@ -154,13 +154,13 @@ def process(input_dir1, input_dir2, midmcsv, canc_to_new_csv, last_metaid, outpu
 
     if not exists(last_metaid):
         with open(last_metaid, 'w' ) as l_mid:
-            l_mid.write("https://w3id.org/oc/meta/br/0600")
+            l_mid.write("0")
 
     with open(last_metaid, "r") as l_mid:
         data = l_mid.read()
-        match = re.search( 'https://w3id.org/oc/meta/br/060(\d+)', data )
+        match = re.search( '(\d+)', data )
         if match:
-            next_metaid = int(match.group(1))+1
+            next_metaid = int(match.group(0))+1
             print("next_metaid", next_metaid)
 
 
@@ -337,11 +337,9 @@ def process(input_dir1, input_dir2, midmcsv, canc_to_new_csv, last_metaid, outpu
                         next_metaid += 1
                         with open( last_metaid, "r" ) as l_mid:
                             data = l_mid.read()
-                            prefix = "https://w3id.org/oc/meta/br/060"
-                            len_prefix = len( prefix )
-                            match = re.search( '(\d+)', data[len_prefix:] )
+                            match = re.search( '(\d+)', data)
                             if match:
-                                ret = prefix + (re.sub( match.group( 0 ), metaid, data[len_prefix:] ))
+                                ret = (re.sub( match.group( 0 ), metaid, data))
                         with open( last_metaid, "w" ) as l_mid:
                             l_mid.write( ret )
 
@@ -442,11 +440,9 @@ def process(input_dir1, input_dir2, midmcsv, canc_to_new_csv, last_metaid, outpu
                         next_metaid += 1
                         with open( last_metaid, "r" ) as l_mid:
                             data = l_mid.read()
-                            prefix = "https://w3id.org/oc/meta/br/060"
-                            len_prefix = len(prefix)
-                            match = re.search( '(\d+)', data[len_prefix:] )
+                            match = re.search( '(\d+)', data)
                             if match:
-                                ret = prefix + (re.sub( match.group( 0 ), metaid, data[len_prefix:] ))
+                                ret = (re.sub( match.group( 0 ), metaid, data))
                         with open(last_metaid, "w") as l_mid:
                             l_mid.write(ret)
 
