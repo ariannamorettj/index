@@ -85,6 +85,7 @@ def create_rdf_from_csv(csvfile_add, csvfile_delete):
         rdf_filename = filename + "_" + cur_date + ".nt"
         g.serialize(destination= rdf_filename, format='nt')
 
+    print("discarded rows", discarded_rows)
     for row in del_existing_lines:
         if row and row not in discarded_rows:
             # store in the id variable the identifier (doi or pmid) without its prefix, and use it in the id's URI
