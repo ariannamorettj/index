@@ -75,9 +75,9 @@ def create_rdf_from_csv(csvfile_add, csvfile_delete):
                     g.add((id_uri, predicate, metaid_uri))
                     print("added triple:", id_uri, predicate, metaid_uri)
 
-        #Save the additiob graph in a file containing the date of creation and the name of the original csv file
+        #Save the addition graph in a file containing the date of creation and the name of the original csv file
         if csvfile_add.endswith('.csv'):
-            match = re.search(".+?(?=.csv)", csvfile_add)
+            match = re.search(".+?(?=\.csv)", csvfile_add)
             if match:
                 filename = match.group(0)
         else:
@@ -101,7 +101,7 @@ def create_rdf_from_csv(csvfile_add, csvfile_delete):
 
     # Save the deletion graph in a file containing the date of creation and the name of the original csv file
     if csvfile_delete.endswith( '.csv' ):
-        match = re.search( ".+?(?=.csv)", csvfile_delete )
+        match = re.search( ".+?(?=\.csv)", csvfile_delete )
         if match:
             filename = match.group( 0 )
     else:
