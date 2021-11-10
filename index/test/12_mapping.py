@@ -8,6 +8,7 @@ from index.identifier.pmidmanager import PMIDManager
 from index.identifier.doimanager import DOIManager
 import shutil
 from rdflib import Graph
+import csv
 
 
 class MappingTest( unittest.TestCase ):
@@ -26,8 +27,10 @@ class MappingTest( unittest.TestCase ):
         self.input_csv_del = "index%stest_data%smapping_global%srdf_from_csv%scsvdel.csv" % (sep, sep, sep, sep)
         self.rdf_from_csv_dir = "index%stest_data%smapping_global%srdf_from_csv" % (sep, sep, sep)
         self.excluded_metaid = "https://w3id.org/oc/meta/br/0605"
+        self.excluded_metaid_value = "5"
 
     def test_get_all_files(self):
+        print("1# TEST")
         all_files, opener = get_all_files(self.input_dir_cnc_csv)
         len_all_files = len(all_files)
         self.assertEqual(len_all_files, 1)
@@ -41,6 +44,7 @@ class MappingTest( unittest.TestCase ):
         self.assertEqual(len_all_map_files, 1)
 
     def test_proess_EntryCreation(self):
+        print("2# TEST")
         if exists(self.output_dir):
             shutil.rmtree(self.output_dir)
         self.assertFalse(exists(self.output_dir))
@@ -63,13 +67,32 @@ class MappingTest( unittest.TestCase ):
         self.assertTrue(exists(self.canc_to_new_mappingfile))
         self.assertTrue(exists(self.last_metaid_file))
 
+
     def test_process_metaid_reassignment(self):
+        print("3# TEST")
+
+        process( self.input_dir_cnc_csv, self.input_dir_mappings, self.metaid_mappingfile, self.canc_to_new_mappingfile,
+                 self.last_metaid_file, self.output_dir )
+
         csvman_metaidmapping = CSVManager(self.metaid_mappingfile)
+
+        print( "BEFORE taking into account new mapping files" )
+        with open(self.metaid_mappingfile) as f:
+            reader = csv.reader( f )
+            for row in reader:
+                print( " ".join( row ) )
+
         metaid_pre_mapping_1 = csvman_metaidmapping.get_value("pmid:2140506")
         metaid_pre_mapping_2 = csvman_metaidmapping.get_value("pmid:1509982")
 
         process(self.input_dir_cnc_csv, self.input_dir_mappings_extra, self.metaid_mappingfile,
                  self.canc_to_new_mappingfile, self.last_metaid_file, self.output_dir )
+
+        print( "AFTER taking into account new mapping files" )
+        with open(self.metaid_mappingfile) as f:
+            reader = csv.reader( f )
+            for row in reader:
+                print( " ".join( row ) )
 
         csvman_metaidmapping2 = CSVManager(self.metaid_mappingfile)
         metaid_post_mapping_1 = csvman_metaidmapping2.get_value("pmid:2140506")
@@ -92,14 +115,21 @@ class MappingTest( unittest.TestCase ):
 
         #check that, in case during the same run an id is assigned a metaid which is then invalidated, and so it is
         #assigned another metaid, only the information about the final metaid is registered.
+        self.assertNotEqual(metaid_pre_mapping_2, csvman_metaidmapping2.get_value("doi:10.1002/mrc.2517"))
+        self.assertEqual(csvman_metaidmapping2.get_value("doi:10.1002/mrc.2517"), metaid_post_mapping_2)
+
         #check that canc_to_new_mid csv file keeps track of the metaid-to-metaid remappings
         csvman_canctonew = CSVManager(self.canc_to_new_mappingfile)
         prev_metaid = list(metaid_pre_mapping_2)[0]
-        print("csvman_canctonew.get_value(prev_metaid)", csvman_canctonew.get_value(prev_metaid))
-        self.assertEqual(csvman_canctonew.get_value(prev_metaid), metaid_pre_mapping_1)
+        self.assertEqual(csvman_canctonew.get_value(prev_metaid), metaid_post_mapping_2)
 
 
     def test_last_metaid_update(self):
+        print("4# TEST")
+        if not exists( self.last_metaid_file):
+            with open(self.last_metaid_file, 'w' ) as l_mid:
+                l_mid.write( "0" )
+
         with open(self.last_metaid_file, "r" ) as l_mid:
             data = l_mid.read()
             match = re.search( '(\d+)', data )
@@ -130,6 +160,8 @@ class MappingTest( unittest.TestCase ):
 
 
     def test_create_rdf_from_csv(self):
+        print("5# TEST")
+
         input_dir = self.rdf_from_csv_dir
         num_input_files = 0
         for entry in scandir(input_dir):
@@ -154,7 +186,6 @@ class MappingTest( unittest.TestCase ):
 
         #check that a nt file was created for each csv input file
         self.assertTrue(num_input_files == num_nt_files)
-
 
 if __name__ == '__main__':
     unittest.main()
