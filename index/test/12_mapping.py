@@ -1,5 +1,5 @@
 import unittest
-from os import sep, remove, scandir
+from os import sep, remove, scandir, rmdir
 import re
 from os.path import exists
 from index.mapping_global.mapping import get_all_files, process, create_rdf_from_csv
@@ -17,10 +17,25 @@ class MappingTest( unittest.TestCase ):
         self.input_dir_cnc_csv_extra = "index%stest_data%sextrasamp_nih_mapping_global%sextrasamp_cnc_output" % (sep, sep, sep)
         self.input_dir_mappings = "index%stest_data%snih_mapping_global%sNIH_mapping" % (sep, sep, sep)
         self.input_dir_mappings_extra = "index%stest_data%sextrasamp_nih_mapping_global%sextrasamp_NIH_mapping" % (sep, sep, sep)
+
+        #copies of the files for the test: test_proess_EntryCreation(self)
         self.output_dir = "index%stest_data%smapping_test_output" % (sep, sep)
         self.metaid_mappingfile = "index%stest_data%smapping_global%smetaidmapping.csv" % (sep, sep, sep)
         self.canc_to_new_mappingfile = "index%stest_data%smapping_global%scanc_to_new_mid.csv" % (sep, sep, sep)
         self.last_metaid_file = "index%stest_data%smapping_global%slast_metaid.txt" % (sep, sep, sep)
+
+        #copies of the files for the test: test_process_metaid_reassignment(self)
+        self.output_dir_1 = "index%stest_data%smapping_test_output_1" % (sep, sep)
+        self.metaid_mappingfile_1 = "index%stest_data%smapping_global%smetaidmapping_1.csv" % (sep, sep, sep)
+        self.canc_to_new_mappingfile_1 = "index%stest_data%smapping_global%scanc_to_new_mid_1.csv" % (sep, sep, sep)
+        self.last_metaid_file_1 = "index%stest_data%smapping_global%slast_metaid_1.txt" % (sep, sep, sep)
+
+        #copies of the files for the test: test_last_metaid_update(self)
+        self.output_dir_2 = "index%stest_data%smapping_test_output_2" % (sep, sep)
+        self.metaid_mappingfile_2 = "index%stest_data%smapping_global%smetaidmapping_2.csv" % (sep, sep, sep)
+        self.canc_to_new_mappingfile_2 = "index%stest_data%smapping_global%scanc_to_new_mid_2.csv" % (sep, sep, sep)
+        self.last_metaid_file_2 = "index%stest_data%smapping_global%slast_metaid_2.txt" % (sep, sep, sep)
+
         self.pmid_manager = PMIDManager()
         self.doi_manager = DOIManager()
         self.input_csv_add = "index%stest_data%smapping_global%srdf_from_csv%scsvadd.csv" % (sep, sep, sep, sep)
@@ -71,13 +86,42 @@ class MappingTest( unittest.TestCase ):
     def test_process_metaid_reassignment(self):
         print("3# TEST")
 
-        process( self.input_dir_cnc_csv, self.input_dir_mappings, self.metaid_mappingfile, self.canc_to_new_mappingfile,
-                 self.last_metaid_file, self.output_dir )
+        if exists(self.output_dir_1):
+            shutil.rmtree(self.output_dir_1)
 
-        csvman_metaidmapping = CSVManager(self.metaid_mappingfile)
+        if exists(self.metaid_mappingfile_1):
+            remove(self.metaid_mappingfile_1)
+            header = ["id", "value"]
+            with open(self.metaid_mappingfile_1, 'w', newline="" ) as midmcsv_file:
+                writer = csv.writer( midmcsv_file )
+                writer.writerow( header )
+
+        if exists(self.canc_to_new_mappingfile_1):
+            remove( self.canc_to_new_mappingfile_1)
+            header = ["id", "value"]
+            with open(self.canc_to_new_mappingfile_1, 'w', newline="" ) as canc_to_new_csv_file:
+                writer = csv.writer(canc_to_new_csv_file)
+                writer.writerow( header )
+
+        if exists(self.last_metaid_file_1):
+            remove(self.last_metaid_file_1)
+        with open(self.last_metaid_file_1, 'w' ) as l_mid:
+            l_mid.write( "0" )
+
+        with open(self.last_metaid_file_1, "r" ) as l_mid:
+            data = l_mid.read()
+            match = re.search( '(\d+)', data )
+            if match:
+                next_metaid = int( match.group( 0 ) ) + 1
+                print( "next_metaid", next_metaid )
+
+        process(self.input_dir_cnc_csv, self.input_dir_mappings, self.metaid_mappingfile_1, self.canc_to_new_mappingfile_1,
+                 self.last_metaid_file_1, self.output_dir_1)
+
+        csvman_metaidmapping = CSVManager(self.metaid_mappingfile_1)
 
         print( "BEFORE taking into account new mapping files" )
-        with open(self.metaid_mappingfile) as f:
+        with open(self.metaid_mappingfile_1) as f:
             reader = csv.reader( f )
             for row in reader:
                 print( " ".join( row ) )
@@ -85,16 +129,16 @@ class MappingTest( unittest.TestCase ):
         metaid_pre_mapping_1 = csvman_metaidmapping.get_value("pmid:2140506")
         metaid_pre_mapping_2 = csvman_metaidmapping.get_value("pmid:1509982")
 
-        process(self.input_dir_cnc_csv, self.input_dir_mappings_extra, self.metaid_mappingfile,
-                 self.canc_to_new_mappingfile, self.last_metaid_file, self.output_dir )
+        process(self.input_dir_cnc_csv, self.input_dir_mappings_extra, self.metaid_mappingfile_1,
+                 self.canc_to_new_mappingfile_1, self.last_metaid_file_1, self.output_dir_1 )
 
         print( "AFTER taking into account new mapping files" )
-        with open(self.metaid_mappingfile) as f:
+        with open(self.metaid_mappingfile_1) as f:
             reader = csv.reader( f )
             for row in reader:
                 print( " ".join( row ) )
 
-        csvman_metaidmapping2 = CSVManager(self.metaid_mappingfile)
+        csvman_metaidmapping2 = CSVManager(self.metaid_mappingfile_1)
         metaid_post_mapping_1 = csvman_metaidmapping2.get_value("pmid:2140506")
         metaid_post_mapping_2 = csvman_metaidmapping2.get_value("pmid:1509982")
 
@@ -119,37 +163,58 @@ class MappingTest( unittest.TestCase ):
         self.assertEqual(csvman_metaidmapping2.get_value("doi:10.1002/mrc.2517"), metaid_post_mapping_2)
 
         #check that canc_to_new_mid csv file keeps track of the metaid-to-metaid remappings
-        csvman_canctonew = CSVManager(self.canc_to_new_mappingfile)
+        csvman_canctonew = CSVManager(self.canc_to_new_mappingfile_1)
         prev_metaid = list(metaid_pre_mapping_2)[0]
         self.assertEqual(csvman_canctonew.get_value(prev_metaid), metaid_post_mapping_2)
 
 
-    def test_last_metaid_update(self):
-        print("4# TEST")
-        if not exists( self.last_metaid_file):
-            with open(self.last_metaid_file, 'w' ) as l_mid:
-                l_mid.write( "0" )
 
-        with open(self.last_metaid_file, "r" ) as l_mid:
+    def test_last_metaid_update(self): #controlla che sia autonoma
+        print("4# TEST")
+
+        if exists(self.output_dir_2):
+            shutil.rmtree(self.output_dir_2)
+
+        if exists(self.metaid_mappingfile_2):
+            remove(self.metaid_mappingfile_2)
+            header = ["id", "value"]
+            with open(self.metaid_mappingfile_2, 'w', newline="" ) as midmcsv_file:
+                writer = csv.writer( midmcsv_file )
+                writer.writerow( header )
+
+        if exists(self.canc_to_new_mappingfile_2):
+            remove( self.canc_to_new_mappingfile_2)
+            header = ["id", "value"]
+            with open(self.canc_to_new_mappingfile_2, 'w', newline="" ) as canc_to_new_csv_file:
+                writer = csv.writer(canc_to_new_csv_file)
+                writer.writerow( header )
+
+        if exists( self.last_metaid_file_2):
+            remove(self.last_metaid_file_2)
+
+        with open(self.last_metaid_file_2, 'w' ) as l_mid:
+            l_mid.write( "0" )
+
+        with open(self.last_metaid_file_2, "r" ) as l_mid:
             data = l_mid.read()
             match = re.search( '(\d+)', data )
             if match:
                 last_metaid_prev = int( match.group(0))
 
-        process(self.input_dir_cnc_csv_extra, self.input_dir_mappings, self.metaid_mappingfile,
-                 self.canc_to_new_mappingfile, self.last_metaid_file, self.output_dir)
+        process(self.input_dir_cnc_csv_extra, self.input_dir_mappings, self.metaid_mappingfile_2,
+                 self.canc_to_new_mappingfile_2, self.last_metaid_file_2, self.output_dir_2)
 
         g = Graph()
-        for entry in scandir(self.output_dir):
+        for entry in scandir(self.output_dir_2):
             if "new_mappings" in entry.path and entry.is_file():
                 new_triples_nt = entry
 
-        g.parse(new_triples_nt.path, format="nt" )
+        g.parse(new_triples_nt.path, format="nt11" )
         new_ids_mapped = 0
         for index, (s, p, o) in enumerate(g):
             new_ids_mapped += 1
 
-        with open(self.last_metaid_file, "r" ) as l_mid:
+        with open(self.last_metaid_file_2, "r" ) as l_mid:
             data = l_mid.read()
             match = re.search( '(\d+)', data )
             if match:
@@ -165,7 +230,7 @@ class MappingTest( unittest.TestCase ):
         input_dir = self.rdf_from_csv_dir
         num_input_files = 0
         for entry in scandir(input_dir):
-            if entry.path.endswith(".nt") and entry.is_file():
+            if entry.path.endswith(".ttl") and entry.is_file():
                 remove(entry)
                 self.assertFalse(exists(entry))
             elif entry.path.endswith(".csv") and entry.is_file():
@@ -174,18 +239,24 @@ class MappingTest( unittest.TestCase ):
         create_rdf_from_csv(self.input_csv_add, self.input_csv_del)
         num_nt_files = 0
         for entry in scandir(input_dir):
-            if entry.path.endswith(".nt") and entry.is_file():
+            if entry.path.endswith(".ttl") and entry.is_file():
                 num_nt_files += 1
                 g = Graph()
-                g.parse(entry.path, format="nt")
+                g.parse(entry.path, format="nt11")
 
                 #check that the triples with the same metaid object present in both the
                 # additions file and in the deletions file were not added at all.
                 for s, p, o in g:
                     self.assertTrue(o != self.excluded_metaid)
 
+                    #controlla che non sia nemmeno in quello di rimozione
+
         #check that a nt file was created for each csv input file
         self.assertTrue(num_input_files == num_nt_files)
+
+
+#per evitare problemi, separa gli output per ogni funzione. E ANCHE PIù COPIE DEGLI STESSI INPUT. Svuota i test a inizio esecuzione
+#il nome del file deve essere ttl, però salva e leggi in nt11
 
 if __name__ == '__main__':
     unittest.main()

@@ -82,8 +82,8 @@ def create_rdf_from_csv(csvfile_add, csvfile_delete):
                 filename = match.group(0)
         else:
             filename = csvfile_add
-        rdf_filename = filename + "_" + cur_date + ".nt"
-        g.serialize(destination= rdf_filename, format='nt')
+        rdf_filename = filename + "_" + cur_date + ".ttl"
+        g.serialize(destination= rdf_filename, format='nt11')
 
     print("discarded rows", discarded_rows)
     for row in del_existing_lines:
@@ -107,8 +107,13 @@ def create_rdf_from_csv(csvfile_add, csvfile_delete):
             filename = match.group( 0 )
     else:
         filename = csvfile_delete
-    rdf_filename = filename + "_" + cur_date + ".nt"
-    gdel.serialize( destination=rdf_filename, format='nt' )
+    rdf_filename = filename + "_" + cur_date + ".ttl"
+    gdel.serialize( destination=rdf_filename, format='nt11' )
+
+
+    #URLLIB.PARSE ha una funzione che si chiama quote che fa l'escaping di tutti i carattri unicode sopra l'asci. SERVE SOLO PER IL RDF.
+    #NECESSARIO SOLO PER I DOI -- guarda QUOTE di CNC. usa quote per avere l'encoding pulito. Ci sono dei dei DOI brutti che hanno bisogno
+    #di un escaping pazzesco. L'altra cosa, per il doi
 
 
 """
