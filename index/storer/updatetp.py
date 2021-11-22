@@ -21,19 +21,18 @@ from argparse import ArgumentParser
 from glob import glob
 from re import sub
 from os.path import basename, normpath
-
+from urllib.parse import quote
 from SPARQLWrapper import SPARQLWrapper
+import pathlib
 
 def add(server, g_url, f_n, date_str, type_file):
     server = SPARQLWrapper(server)
     server.method = 'POST'
     print("fn:", f_n)
     print("abspath(f_n):", abspath(f_n))
-    my_query = 'LOAD <file:' + abspath(f_n) + '> INTO GRAPH <' + g_url + '>'
+    my_query = 'LOAD <' + pathlib.Path(abspath(f_n)).as_uri() + '> INTO GRAPH <' + g_url + '>'
     print("this is the query,", my_query)
     server.setQuery(my_query)
-    print("server.setQuery(my_query)",server.setQuery(my_query))
-    print("setQuery:", server.setQuery('LOAD <file:' + abspath(f_n) + '> INTO GRAPH <' + g_url + '>'))
     server.query()
 
     with open("updatetp_report_%s_%s.txt" % (type_file, date_str), "a", 
@@ -61,7 +60,7 @@ if __name__ == "__main__":
     SE_URL = args.se_url
     INPUT_FILE = args.input_file
     GRAPH_URL = args.graph_name
-    date_str = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+    date_str = datetime.now().strftime('%Y-%m-%dT%H%M%S')
     type_file = "prov" if "prov" + sep in INPUT_FILE else "data"
 
     if not args.force and type_file == "prov" and type_file not in GRAPH_URL:

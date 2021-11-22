@@ -1,0 +1,2 @@
+Added file 'C:\Users\arimoretti\Documents\GitHub\index\index\test_data\mapping\deleted_mappings_2021-11-11.ttl'
+Added file 'C:\Users\arimoretti\Documents\GitHub\index\index\test_data\mapping\new_mappings_2021-11-11.ttl'
