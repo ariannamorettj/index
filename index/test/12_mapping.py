@@ -1,5 +1,7 @@
 import unittest
-from os import sep, remove, scandir, rmdir
+from os import sep, remove, scandir, rmdir, makedirs
+import os
+import shutil
 import re
 from os.path import exists
 from index.mapping_global.mapping import get_all_files, process, create_rdf_from_csv
@@ -38,9 +40,11 @@ class MappingTest( unittest.TestCase ):
 
         self.pmid_manager = PMIDManager()
         self.doi_manager = DOIManager()
+
         self.input_csv_add = "index%stest_data%smapping_global%srdf_from_csv%scsvadd.csv" % (sep, sep, sep, sep)
         self.input_csv_del = "index%stest_data%smapping_global%srdf_from_csv%scsvdel.csv" % (sep, sep, sep, sep)
-        self.rdf_from_csv_dir = "index%stest_data%smapping_global%srdf_from_csv" % (sep, sep, sep)
+        self.rdf_from_csv_output_dir = "index%stest_data%smapping_global%srdf_from_csv_out" % (sep, sep, sep)
+
         self.excluded_metaid = "https://w3id.org/oc/meta/br/0605"
         self.excluded_metaid_value = "5"
 
@@ -167,6 +171,40 @@ class MappingTest( unittest.TestCase ):
         prev_metaid = list(metaid_pre_mapping_2)[0]
         self.assertEqual(csvman_canctonew.get_value(prev_metaid), metaid_post_mapping_2)
 
+    def test_create_rdf_from_csv(self):
+        print("5# TEST")
+        if not exists(self.rdf_from_csv_output_dir):
+            makedirs(self.rdf_from_csv_output_dir)
+
+        elif exists(self.rdf_from_csv_output_dir):
+            for files in os.listdir(self.rdf_from_csv_output_dir):
+                path = os.path.join(self.rdf_from_csv_output_dir, files )
+                try:
+                    shutil.rmtree( path )
+                except OSError:
+                    os.remove( path )
+
+        self.assertTrue(exists(self.rdf_from_csv_output_dir))
+        self.assertEqual(len(os.listdir(self.rdf_from_csv_output_dir)), 0)
+
+        create_rdf_from_csv(self.input_csv_add, self.input_csv_del, self.rdf_from_csv_output_dir)
+
+        self.assertEqual(len(os.listdir(self.rdf_from_csv_output_dir)), 2)
+
+        for subdir, dirs, files in os.walk(self.rdf_from_csv_output_dir):
+            for dir in dirs:
+                dir_path = self.rdf_from_csv_output_dir + "%s" % (sep) + dir
+                self.assertTrue( len( os.listdir(dir_path)) > 0 )
+                self.assertEqual( len( os.listdir(dir_path) ), 1 )
+
+            for file in files:
+                filepath = os.path.join( subdir, file )
+                if filepath.endswith( ".ttl" ):
+                    g = Graph()
+                    g.parse(filepath, format="nt11")
+                    for s, p, o in g:
+                        self.assertTrue( o != self.excluded_metaid )
+
 
 
     def test_last_metaid_update(self): #controlla che sia autonoma
@@ -205,11 +243,13 @@ class MappingTest( unittest.TestCase ):
                  self.canc_to_new_mappingfile_2, self.last_metaid_file_2, self.output_dir_2)
 
         g = Graph()
-        for entry in scandir(self.output_dir_2):
-            if "new_mappings" in entry.path and entry.is_file():
-                new_triples_nt = entry
+        for subdir, dirs, files in os.walk(self.output_dir_2):
+            for file in files:
+                filepath = os.path.join( subdir, file )
+                if "new_mappings" in filepath:
+                    new_triples_nt = filepath
 
-        g.parse(new_triples_nt.path, format="nt11" )
+        g.parse(new_triples_nt, format="nt11" )
         new_ids_mapped = 0
         for index, (s, p, o) in enumerate(g):
             new_ids_mapped += 1
@@ -224,39 +264,6 @@ class MappingTest( unittest.TestCase ):
         self.assertEqual(last_metaid_cur, (last_metaid_prev + new_ids_mapped))
 
 
-    def test_create_rdf_from_csv(self):
-        print("5# TEST")
-
-        input_dir = self.rdf_from_csv_dir
-        num_input_files = 0
-        for entry in scandir(input_dir):
-            if entry.path.endswith(".ttl") and entry.is_file():
-                remove(entry)
-                self.assertFalse(exists(entry))
-            elif entry.path.endswith(".csv") and entry.is_file():
-                num_input_files += 1
-
-        create_rdf_from_csv(self.input_csv_add, self.input_csv_del)
-        num_nt_files = 0
-        for entry in scandir(input_dir):
-            if entry.path.endswith(".ttl") and entry.is_file():
-                num_nt_files += 1
-                g = Graph()
-                g.parse(entry.path, format="nt11")
-
-                #check that the triples with the same metaid object present in both the
-                # additions file and in the deletions file were not added at all.
-                for s, p, o in g:
-                    self.assertTrue(o != self.excluded_metaid)
-
-                    #controlla che non sia nemmeno in quello di rimozione
-
-        #check that a nt file was created for each csv input file
-        self.assertTrue(num_input_files == num_nt_files)
-
-
-#per evitare problemi, separa gli output per ogni funzione. E ANCHE PIù COPIE DEGLI STESSI INPUT. Svuota i test a inizio esecuzione
-#il nome del file deve essere ttl, però salva e leggi in nt11
 
 if __name__ == '__main__':
     unittest.main()

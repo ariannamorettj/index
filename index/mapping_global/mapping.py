@@ -40,7 +40,18 @@ def get_all_files(i_dir):
     return result, opener
 
 #Create a nt files from a csv files
-def create_rdf_from_csv(csvfile_add, csvfile_delete):
+def create_rdf_from_csv(csvfile_add, csvfile_delete, output_dir):
+    del_folder = "%striples_to_remove" % (sep)
+    add_folder = "%striples_to_add" % (sep)
+    del_folder_path = output_dir + del_folder
+    add_folder_path = output_dir + add_folder
+
+    if not exists(del_folder_path):
+        makedirs(del_folder_path)
+
+    if not exists(add_folder_path):
+        makedirs(add_folder_path)
+
     g = Graph()
     gdel = Graph()
 
@@ -76,14 +87,9 @@ def create_rdf_from_csv(csvfile_add, csvfile_delete):
                     print("added triple:", id_uri, predicate, metaid_uri)
 
         #Save the addition graph in a file containing the date of creation and the name of the original csv file
-        if csvfile_add.endswith('.csv'):
-            match = re.search(".+?(?=\.csv)", csvfile_add)
-            if match:
-                filename = match.group(0)
-        else:
-            filename = csvfile_add
+        filename = "new_mappings"
         rdf_filename = filename + "_" + cur_date + ".ttl"
-        g.serialize(destination= rdf_filename, format='nt11')
+        g.serialize(destination= add_folder_path + "%s" % (sep) + rdf_filename, format='nt11')
 
     print("discarded rows", discarded_rows)
     for row in del_existing_lines:
@@ -101,20 +107,9 @@ def create_rdf_from_csv(csvfile_add, csvfile_delete):
                 print( "added triple to delete file:", id_uri, predicate, metaid_uri )
 
     # Save the deletion graph in a file containing the date of creation and the name of the original csv file
-    if csvfile_delete.endswith( '.csv' ):
-        match = re.search( ".+?(?=\.csv)", csvfile_delete )
-        if match:
-            filename = match.group( 0 )
-    else:
-        filename = csvfile_delete
+    filename = "del_mappings"
     rdf_filename = filename + "_" + cur_date + ".ttl"
-    gdel.serialize( destination=rdf_filename, format='nt11' )
-
-
-    #URLLIB.PARSE ha una funzione che si chiama quote che fa l'escaping di tutti i carattri unicode sopra l'asci. SERVE SOLO PER IL RDF.
-    #NECESSARIO SOLO PER I DOI -- guarda QUOTE di CNC. usa quote per avere l'encoding pulito. Ci sono dei dei DOI brutti che hanno bisogno
-    #di un escaping pazzesco. L'altra cosa, per il doi
-
+    gdel.serialize(destination= del_folder_path + "%s" % (sep) + rdf_filename, format='nt11')
 
 """
 process is the main function. It takes in input:
@@ -471,7 +466,7 @@ def process(input_dir1, input_dir2, midmcsv, canc_to_new_csv, last_metaid, outpu
                                     metaid_mapping.substitute_value( id_cited, metaid )
                                     new_mappings_csv.add_value( id_cited, metaid )
 
-    create_rdf_from_csv(new_mappings, deleted_mappings)
+    create_rdf_from_csv(new_mappings, deleted_mappings, output_dir)
     os.remove(new_mappings)
     os.remove(deleted_mappings)
 
