@@ -24,20 +24,39 @@ from os.path import basename, normpath
 from urllib.parse import quote
 from SPARQLWrapper import SPARQLWrapper
 import pathlib
+from rdflib import Graph, Literal, RDF, URIRef
 
 def add(server, g_url, f_n, date_str, type_file):
+    print("ADD")
     server = SPARQLWrapper(server)
     server.method = 'POST'
-    print("fn:", f_n)
-    print("abspath(f_n):", abspath(f_n))
     my_query = 'LOAD <' + pathlib.Path(abspath(f_n)).as_uri() + '> INTO GRAPH <' + g_url + '>'
-    print("this is the query,", my_query)
     server.setQuery(my_query)
     server.query()
 
     with open("updatetp_report_%s_%s.txt" % (type_file, date_str), "a", 
               encoding="utf8") as h:
         h.write("Added file '%s'\n" % f_n)
+
+def remove(server, g_url, f_n, date_str, type_file):
+    print("REMOVE")
+    server = SPARQLWrapper(server)
+    server.method = 'POST'
+    file_path = pathlib.Path(abspath(f_n)).as_uri()
+
+    #remove all the triples from the specified file
+    g = Graph()
+    g.parse(file_path, format="nt11" )
+
+    for s, p, o in g:
+        triple = "<" + str(s) + ">" + "<" + str(p) + ">" + "<" + str(o) + ">" + "."
+        my_query = 'DELETE DATA {GRAPH <' + g_url + '> {' + triple + '} }'
+        server.setQuery(my_query)
+        server.query()
+
+    with open("updatetp_report_%s_%s.txt" % (type_file, date_str), "a",
+              encoding="utf8") as h:
+        h.write("Removed triples from file '%s'\n" % f_n)
 
 
 if __name__ == "__main__":
@@ -50,6 +69,8 @@ if __name__ == "__main__":
                             help="The URL of the SPARQL endpoint.")
     arg_parser.add_argument("-i", "--input_file", dest="input_file", required=True,
                             help="The path to the NT file to upload on the triplestore.")
+    arg_parser.add_argument("-i_r", "--input_file_r", dest="input_file_r", required=True,
+                            help="The path to the NT file whose triples are to remove from the triplestore.")
     arg_parser.add_argument("-g", "--graph", dest="graph_name", required=True,
                             help="The graph URL to associate to the triples.")
     arg_parser.add_argument("-f", "--force", dest="force", default=False, action="store_true",
@@ -59,6 +80,7 @@ if __name__ == "__main__":
 
     SE_URL = args.se_url
     INPUT_FILE = args.input_file
+    INPUT_FILE_R = args.input_file_r
     GRAPH_URL = args.graph_name
     date_str = datetime.now().strftime('%Y-%m-%dT%H%M%S')
     type_file = "prov" if "prov" + sep in INPUT_FILE else "data"
@@ -95,6 +117,27 @@ if __name__ == "__main__":
     for idx, cur_file in enumerate(all_files):
         print("\nUploading file '%s'" % cur_file)
         add(SE_URL, GRAPH_URL, cur_file, date_str, type_file)
-        print("Done.")
+        print("ADD: Done.")
+
+#extension for removing triples
+    all_files_r = []
+    if isdir(INPUT_FILE_R):
+        for cur_dir, cur_subdir, cur_files in walk(INPUT_FILE_R):
+            for cur_file in cur_files:
+                cur_file_abs_path = cur_dir + sep + cur_file
+                if basename(cur_file_abs_path) not in already_done and \
+                        (cur_file_abs_path.endswith(".nt") or cur_file_abs_path.endswith(".ttl")):
+                    all_files_r.append(cur_file_abs_path)
+    else:
+        all_files_r.append(INPUT_FILE_R)
+
+    print("%s files to remove." % str(len(all_files_r)))
+
+    for idx, cur_file in enumerate(all_files_r):
+        print("\nRemoving triples from file '%s'" % cur_file)
+        remove(SE_URL, GRAPH_URL, cur_file, date_str, type_file)
+        print("REMOVE: Done.")
 
     print("# Process ends")
+
+#python -m index.storer.updatetp -s "http://localhost:3001/blazegraph/sparql" -i "index/test_data/mapping_test_output_1/triples_to_add" -i_r "index/test_data/mapping_test_output_1/triples_to_remove" -g "https://w3id.org/oc/index/noci/"
