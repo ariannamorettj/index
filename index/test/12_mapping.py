@@ -267,4 +267,4 @@ class MappingTest( unittest.TestCase ):
 
 if __name__ == '__main__':
     unittest.main()
-#C:\Users\arimoretti\Documents\GitHub\index>python -m unittest index.test.12_mapping
+#python -m unittest index.test.12_mapping

@@ -96,7 +96,6 @@ def process(input_dir, output_dir, n):
     citing_pmid_with_no_date = set()
     valid_pmid = CSVManager( output_dir + sep + "valid_pmid.csv" )
     valid_doi = CSVManager("index/test_data/crossref_glob" + sep + "valid_doi.csv")
-    #doi_pmid_mapping = CSVManager( output_dir + sep + "pmid_to_doi.csv" )
     id_date = CSVManager( output_dir + sep + "id_date_pmid.csv" )
     id_issn = CSVManager( output_dir + sep + "id_issn_pmid.csv" )
     id_orcid = CSVManager( output_dir + sep + "id_orcid_pmid.csv" )
