@@ -65,8 +65,8 @@ def process(input_dir, output_dir):
                 doi = str(row["doi"])
                 if pmid != "" and doi != "":
                     if pmid_manager.is_valid(pmid) and doi_manager.is_valid(doi):
-                        pmid = pmid_manager.p + pmid
-                        doi = doi_manager.p + doi #TOGLIERE QUESTO E USA NORMALISE, controlla il default per il prefix
+                        pmid = pmid_manager.normalise(pmid, include_prefix=True)
+                        doi = doi_manager.normalise(doi, include_prefix=True)
                         pmid_doi_mapping.add_value(pmid, doi)
 
 if __name__ == "__main__":

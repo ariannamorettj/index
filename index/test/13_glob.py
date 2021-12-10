@@ -1,8 +1,6 @@
 import unittest
-from os import sep, remove, scandir, rmdir, makedirs
+from os import sep, remove
 import os
-import shutil
-import re
 from os.path import exists
 from index.noci.glob1 import issn_data_recover, issn_data_to_cache, build_pubdate, get_all_files, process
 from index.storer.csvmanager import CSVManager
@@ -11,8 +9,6 @@ from index.identifier.orcidmanager import ORCIDManager
 from index.identifier.pmidmanager import PMIDManager
 from index.identifier.doimanager import DOIManager
 import shutil
-from rdflib import Graph
-import csv
 import pandas as pd
 
 class MyTestCase( unittest.TestCase ):
@@ -85,15 +81,25 @@ class MyTestCase( unittest.TestCase ):
             for index, row in f.iterrows():
                 if index == 1:
                     pmid = row["pmid"]
-                    doi = row["doi"]
 
-        citing_pmid = "pmid:" + self.pmid_manager.normalise(pmid)
-        #corresp_doi = self.doi_manager.normalise(doi)
+        citing_pmid = self.pmid_manager.normalise(pmid, include_prefix=True)
 
         self.assertEqual(self.valid_pmid.get_value(citing_pmid), {'v'})
         self.assertEqual(self.valid_pmid.get_value(self.sample_reference), {'v'})
         self.assertEqual(self.id_date.get_value(citing_pmid), {'1998'})
         self.assertEqual(self.id_issn.get_value(citing_pmid), {'0918-8959', '1348-4540'})
+
+        df = pd.DataFrame()
+        for chunk in pd.read_csv( self.csv_sample, chunksize=1000 ):
+            f = pd.concat( [df, chunk], ignore_index=True )
+            f.fillna( "", inplace=True )
+            for index, row in f.iterrows():
+                if index == 0:
+                    pmid = row["pmid"]
+
+        citing_pmid = self.pmid_manager.normalise(pmid, include_prefix=True)
+
+        self.assertEqual(self.id_orcid.get_value(citing_pmid), {'0000-0002-0524-4077'})
 
 
 if __name__ == '__main__':

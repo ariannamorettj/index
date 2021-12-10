@@ -1,0 +1,2 @@
+Added file 'index/test_data/mapping_test_output_1/triples_to_add\new_mappings_2021-12-03.ttl'
+Removed triples from file 'index/test_data/mapping_test_output_1/triples_to_remove\del_mappings_2021-12-03.ttl'

@@ -47,4 +47,4 @@ class NociMappingTest( unittest.TestCase ):
 if __name__ == '__main__':
     unittest.main()
 
-#C:\Users\arimoretti\Documents\GitHub\index>python -m unittest index.test.11_nocimapping
+#python -m unittest index.test.11_nocimapping

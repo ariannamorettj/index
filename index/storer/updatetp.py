@@ -38,7 +38,7 @@ def add(server, g_url, f_n, date_str, type_file):
               encoding="utf8") as h:
         h.write("Added file '%s'\n" % f_n)
 
-def remove(server, g_url, f_n, date_str, type_file):
+def remove(server, g_url, f_n, date_str, type_file, n):
     print("REMOVE")
     server = SPARQLWrapper(server)
     server.method = 'POST'
@@ -48,11 +48,27 @@ def remove(server, g_url, f_n, date_str, type_file):
     g = Graph()
     g.parse(file_path, format="nt11" )
 
-    for s, p, o in g:
-        triple = "<" + str(s) + ">" + "<" + str(p) + ">" + "<" + str(o) + ">" + "."
-        my_query = 'DELETE DATA {GRAPH <' + g_url + '> {' + triple + '} }'
-        server.setQuery(my_query)
-        server.query()
+    i = 0
+    triples_group = ""
+
+    for index, (s, p, o) in enumerate(g):
+        triple = "<" + str( s ) + ">" + "<" + str( p ) + ">" + "<" + str( o ) + ">" + "."
+        i += 1
+        if i == int(n):
+            triples_group = triples_group + triple + " "
+            i = 0
+            my_query = 'DELETE DATA {GRAPH <' + g_url + '> {' + triples_group + '} }'
+            server.setQuery(my_query)
+            server.query()
+            triples_group = ""
+
+        else:
+            triples_group = triples_group + triple + " "
+
+    triples_group = triples_group + triple + " "
+    my_query = 'DELETE DATA {GRAPH <' + g_url + '> {' + triples_group + '} }'
+    server.setQuery( my_query )
+    server.query()
 
     with open("updatetp_report_%s_%s.txt" % (type_file, date_str), "a",
               encoding="utf8") as h:
@@ -75,6 +91,9 @@ if __name__ == "__main__":
                             help="The graph URL to associate to the triples.")
     arg_parser.add_argument("-f", "--force", dest="force", default=False, action="store_true",
                             help="Force the creation of the triples associated to the input graph.")
+    arg_parser.add_argument("-n", "--number", dest="number", required=True,
+                            help="Number of triples after which the query to remove triples from the triplestore "
+                                 "is performed")
 
     args = arg_parser.parse_args()
 
@@ -82,6 +101,7 @@ if __name__ == "__main__":
     INPUT_FILE = args.input_file
     INPUT_FILE_R = args.input_file_r
     GRAPH_URL = args.graph_name
+    TRIPLES_NUM = args.number
     date_str = datetime.now().strftime('%Y-%m-%dT%H%M%S')
     type_file = "prov" if "prov" + sep in INPUT_FILE else "data"
 
@@ -135,9 +155,9 @@ if __name__ == "__main__":
 
     for idx, cur_file in enumerate(all_files_r):
         print("\nRemoving triples from file '%s'" % cur_file)
-        remove(SE_URL, GRAPH_URL, cur_file, date_str, type_file)
+        remove(SE_URL, GRAPH_URL, cur_file, date_str, type_file, TRIPLES_NUM)
         print("REMOVE: Done.")
 
     print("# Process ends")
 
-#python -m index.storer.updatetp -s "http://localhost:3001/blazegraph/sparql" -i "index/test_data/mapping_test_output_1/triples_to_add" -i_r "index/test_data/mapping_test_output_1/triples_to_remove" -g "https://w3id.org/oc/index/noci/"
+#python -m index.storer.updatetp -s "http://localhost:3001/blazegraph/sparql" -i "index/test_data/mapping_test_output_1/triples_to_add" -i_r "index/test_data/mapping_test_output_1/triples_to_remove" -g "https://w3id.org/oc/index/noci/" -n 3
