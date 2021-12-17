@@ -65,10 +65,11 @@ def remove(server, g_url, f_n, date_str, type_file, n):
         else:
             triples_group = triples_group + triple + " "
 
-    triples_group = triples_group + triple + " "
-    my_query = 'DELETE DATA {GRAPH <' + g_url + '> {' + triples_group + '} }'
-    server.setQuery( my_query )
-    server.query()
+    if triples_group != "":
+        triples_group = triples_group + triple + " "
+        my_query = 'DELETE DATA {GRAPH <' + g_url + '> {' + triples_group + '} }'
+        server.setQuery( my_query )
+        server.query()
 
     with open("updatetp_report_%s_%s.txt" % (type_file, date_str), "a",
               encoding="utf8") as h:
