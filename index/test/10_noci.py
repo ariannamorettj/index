@@ -11,8 +11,8 @@ from csv import DictReader
 class NOCITest(unittest.TestCase):
 
     def setUp(self):
-        self.input_file = "index%stest_data%snoci_dump%ssource.csv" % (sep, sep, sep)
-        self.citations = "index%stest_data%snoci_dump%scitations.csv" % (sep, sep, sep)
+        self.input_file = "index%stest_data%snih_dump%ssource.csv" % (sep, sep, sep)
+        self.citations = "index%stest_data%snih_dump%scitations.csv" % (sep, sep, sep)
 
     def test_citation_source(self):
         ns = NIHCitationSource( self.input_file )
