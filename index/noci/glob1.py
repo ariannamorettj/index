@@ -27,14 +27,13 @@ from index.identifier.orcidmanager import ORCIDManager
 from os import sep, makedirs, walk
 import os
 from os.path import exists
-import csv
 import json
-from collections import Counter
 from re import sub
 from index.citation.oci import Citation
 from zipfile import ZipFile
 from tarfile import TarFile
 import re
+from timeit import default_timer as timer
 
 def issn_data_recover(directory):
     journal_issn_dict = dict()
@@ -52,7 +51,7 @@ def issn_data_to_cache(name_issn_dict, directory):
     with open(filename, 'w', encoding='utf-8' ) as fd:
             json.dump(name_issn_dict, fd, ensure_ascii=False, indent=4)
 
-#PUB DATE EXTRACTION : should take in input a data structure representing one publication
+#PUB DATE EXTRACTION : takes in input a data structure representing a bibliographic entity
 def build_pubdate(row):
     year = str(row["year"])
     str_year = sub( "[^\d]", "", year)[:4]
@@ -62,7 +61,7 @@ def build_pubdate(row):
         return None
 
 
-# Function aimed at extracting all the needed files for the input directory
+# get_all_files extracts all the needed files from the input directory
 def get_all_files(i_dir):
     result = []
     opener = None
@@ -99,7 +98,7 @@ def process(input_dir, output_dir, n):
     id_date = CSVManager( output_dir + sep + "id_date_pmid.csv" )
     id_issn = CSVManager( output_dir + sep + "id_issn_pmid.csv" )
     id_orcid = CSVManager( output_dir + sep + "id_orcid_pmid.csv" )
-    journal_issn_dict = issn_data_recover(output_dir) #just an empty dict in case the code never broke
+    journal_issn_dict = issn_data_recover(output_dir) #just an empty dict, in case of a code break
     pmid_manager = PMIDManager(valid_pmid)
     crossref_resource_finder = CrossrefResourceFinder(valid_doi)
     orcid_resource_finder = ORCIDResourceFinder(valid_doi)
@@ -129,7 +128,6 @@ def process(input_dir, output_dir, n):
                 citing_pmid = pmid_manager.normalise(row['pmid'], True)
                 pmid_manager.set_valid(citing_pmid)
                 citing_doi = doi_manager.normalise(row['doi'], True)
-                #doi_manager.set_valid(citing_doi)
 
                 if id_date.get_value(citing_pmid) is None:
                     citing_date = Citation.check_date(build_pubdate(row))
@@ -167,6 +165,7 @@ def process(input_dir, output_dir, n):
                             for orcid in orcid_set:
                                 orcid_norm = orcid_manager.normalise( orcid )
                                 id_orcid.add_value(citing_pmid, orcid_norm)
+
             issn_data_to_cache( journal_issn_dict, output_dir )
 
 
@@ -194,7 +193,6 @@ def process(input_dir, output_dir, n):
                     else:
                         print("invalid cited pmid discarded:", cited_pmid)
 
-    #Check if it is correct to do it also in this case
     for pmid in citing_pmid_with_no_date:
         id_date.add_value( pmid, "" )
 
@@ -215,7 +213,12 @@ if __name__ == "__main__":
 
 
     args = arg_parser.parse_args()
+
+    start = timer()
     process(args.input_dir, args.output_dir, args.n)
+    end = timer()
+    #calculate elapsed time
+    print("elapsed time, in seconds:", (end-start))
 
 
 #python -m index.noci.glob1 -i "index/test_data/nih_dump" -o "index/test_data/nih_glob1" -n 20

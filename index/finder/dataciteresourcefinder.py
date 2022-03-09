@@ -27,7 +27,7 @@ class DataCiteResourceFinder(ApiIDResourceFinder):
         self.api = "https://api.datacite.org/dois/"
         self.use_api_service = use_api_service
         super(DataCiteResourceFinder, self).__init__(date=date, orcid=orcid, issn=issn, id=doi, id_type=OCIManager.doi_type,
-                                                     use_api_service=use_api_service) #doi=doi corrected: id=doi
+                                                     use_api_service=use_api_service)
 
     def _get_orcid(self, json_obj):
         result = set()

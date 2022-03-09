@@ -2,15 +2,12 @@ from index.identifier.identifiermanager import IdentifierManager
 from re import sub, match
 from urllib.parse import unquote, quote
 from requests import get
-from json import loads
 from index.storer.csvmanager import CSVManager
 from requests import ReadTimeout
 from requests.exceptions import ConnectionError
 from time import sleep
 from bs4 import BeautifulSoup
-from tempfile import NamedTemporaryFile
-import shutil
-import csv
+
 
 
 class PMIDManager( IdentifierManager ):
@@ -52,25 +49,18 @@ class PMIDManager( IdentifierManager ):
     def __pmid_exists(self, pmid_full):
         pmid = self.normalise( pmid_full )
         if self.use_api_service:
-            print( "usa API?" )
             tentative = 3
             while tentative:
                 tentative -= 1
                 try:
-                    print( self.api + quote( pmid ) + "/?format=pmid" )
                     r = get( self.api + quote( pmid ) + "/?format=pmid", headers=self.headers, timeout=30 )
                     if r.status_code == 200:
                         r.encoding = "utf-8"
-                        print("Did I find the ID?", r.text, pmid)
 
-                        soup = BeautifulSoup( r.content )
-                        print( "This is BS soup", soup )
+                        soup = BeautifulSoup( r.content, features="lxml" )
                         for i in soup.find_all( "meta", {"name": "uid"} ):
                             id = i["content"]
-                            print("The id is: ", id)
-                            print("The pm id is: ", pmid)
                             if id == pmid:
-                                print("id == pmid: returns true")
                                 return True
 
                 except ReadTimeout:

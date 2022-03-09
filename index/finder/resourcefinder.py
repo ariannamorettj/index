@@ -32,10 +32,7 @@ class ResourceFinder(object):
     the signatures of the methods that should be implemented, and a basic
     constructor."""
 
-    def __init__(self, date=None, orcid=None, issn=None, id=None, id_type=None, **params): #vedere se crea problemi l'aggiunta di id_type
-        #**params significa che non genera errore a causa di questo: oltre a quelli obbligatori (o meglio, i default),
-        #se ne possono aggiungere altri a piacimento. è importante perché nel resource finder abbiamo indicato i parametri generali, ma alcuni specifici hanno bisogno di altri parametri
-        #qui bisognava lasciare l'opportunità di lasciare l'estensione ragionevole. quindi per lui id era in default none e doi era un'altra cosa
+    def __init__(self, date=None, orcid=None, issn=None, id=None, id_type=None, **params):
         if date is None:
             date = CSVManager(store_new=False)
         if orcid is None:
@@ -115,9 +112,6 @@ class ApiIDResourceFinder(ResourceFinder): #The name of the class was changed
     def _call_api(self, id_full):
         pass
 
-    # The implementation of the following methods is strictly dependent on the actual
-    # implementation of the previous three methods, since they strictly reuse them
-    # for returning the result.
     def get_orcid(self, id_string):
         return self._get_item(id_string, self.orcid)
 
@@ -125,16 +119,12 @@ class ApiIDResourceFinder(ResourceFinder): #The name of the class was changed
         return self._get_item(id_string, self.date)
 
     def get_container_issn(self, id_string):
-        print("self._get_item(id_string, self.issn)", self._get_item(id_string, self.issn), "per l'id string:", id_string, "e il self.issn", self.issn)
         return self._get_item(id_string, self.issn)
 
-    def is_valid(self, id_string): #FAI IN TUTTI COSì
-        print("id_string", id_string, "id_type", self.id_type)
+    def is_valid(self, id_string):
         if self.id_type == OCIManager.doi_type:
-            print("IT IS A DOI")
             return self.dm.is_valid(id_string)
         elif self.id_type == OCIManager.pmid_type:
-            print("IT IS A PMID")
             return self.pm.is_valid(id_string)
         else:
             print("The id_type specified is not compliant")
@@ -149,15 +139,10 @@ class ApiIDResourceFinder(ResourceFinder): #The name of the class was changed
 
 
     def _get_item(self, id_entity, csv_manager):
-        print("id_entity",id_entity)
-        print("csv_manager",csv_manager)
         if self.is_valid(id_entity):
-            print("self.is_valid(id_entity)",self.is_valid(id_entity))
             id = self.normalise(id_entity)
-            print("self.normalise(id_entity)",self.normalise(id_entity))
             if csv_manager.get_value(id) is None:
-                print("csv_manager.get_value(id) is None for", csv_manager.get_value(id))
-                json_obj = self._call_api(id) #la prima volta c'erano solo json. quello che restituirà sarà sicuramente compliant. Non è un problema è solo il nome della variabile
+                json_obj = self._call_api(id)
 
                 if json_obj is not None:
                     for issn in self._get_issn(json_obj):

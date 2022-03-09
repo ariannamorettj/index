@@ -1,0 +1,15 @@
+<https://w3id.org/oc/index/noci/ci/016002010400050006-016002090402000700> <http://purl.org/spar/cito/hasCitationTimeSpan> "P3Y8M"^^<http://www.w3.org/2001/XMLSchema#duration> .
+<https://w3id.org/oc/index/noci/ci/016002010400050006-016002090402000700> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://purl.org/spar/cito/AuthorSelfCitation> .
+<https://w3id.org/oc/index/noci/ci/016002010400050006-016002090402000700> <http://purl.org/spar/cito/hasCitedEntity> <https://pubmed.ncbi.nlm.nih.gov/2942070> .
+<https://w3id.org/oc/index/noci/ci/016002010400050006-016002090402000700> <http://purl.org/spar/cito/hasCitingEntity> <https://pubmed.ncbi.nlm.nih.gov/2140506> .
+<https://w3id.org/oc/index/noci/ci/016002010400050006-016002090402000700> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://purl.org/spar/cito/Citation> .
+<https://w3id.org/oc/index/noci/ci/016002010400050006-016002090402000700> <http://purl.org/spar/cito/hasCitationCreationDate> "1990-04"^^<http://www.w3.org/2001/XMLSchema#gYearMonth> .
+
+<https://w3id.org/oc/index/noci/ci/016001050203050709-016007000907050609> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://purl.org/spar/cito/AuthorSelfCitation> .
+<https://w3id.org/oc/index/noci/ci/016001050203050709-016007000907050609> <http://purl.org/spar/cito/hasCitationCreationDate> "2018-06"^^<http://www.w3.org/2001/XMLSchema#gYearMonth> .
+<https://w3id.org/oc/index/noci/ci/016001050203050709-016007000907050609> <http://purl.org/spar/cito/hasCitationTimeSpan> "P35Y10M"^^<http://www.w3.org/2001/XMLSchema#duration> .
+<https://w3id.org/oc/index/noci/ci/016001050203050709-016007000907050609> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://purl.org/spar/cito/Citation> .
+<https://w3id.org/oc/index/noci/ci/016001050203050709-016007000907050609> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://purl.org/spar/cito/JournalSelfCitation> .
+<https://w3id.org/oc/index/noci/ci/016001050203050709-016007000907050609> <http://purl.org/spar/cito/hasCitingEntity> <https://pubmed.ncbi.nlm.nih.gov/1523579> .
+<https://w3id.org/oc/index/noci/ci/016001050203050709-016007000907050609> <http://purl.org/spar/cito/hasCitedEntity> <https://pubmed.ncbi.nlm.nih.gov/7097569> .
+

@@ -47,7 +47,6 @@ class ResourceFinderTest(unittest.TestCase):
         handler = ResourceFinderHandler(
             [CrossrefResourceFinder(), DataCiteResourceFinder(), ORCIDResourceFinder(), NIHResourceFinder()])
         self.assertTrue(handler.share_issn("10.1007/s11192-018-2988-z", "10.1007/s11192-015-1565-y"))
-        #self.assertTrue(handler.share_issn("1609936", "1509982"))
         self.assertFalse(handler.share_issn("10.1007/s11192-018-2988-z", "10.6092/issn.2532-8816/8555"))
 
     def test_handler_share_orcid(self):
@@ -65,9 +64,7 @@ class ResourceFinderTest(unittest.TestCase):
         # Do use support files, but avoid using APIs
         of_2 = ORCIDResourceFinder(orcid=CSVManager(self.orcid_path),
                                    doi=CSVManager(self.doi_path), use_api_service=False)
-        print("of_2.dm.valid_doi.csv_path", of_2.dm.valid_doi.csv_path)
         container = of_2.get_orcid("10.1108/jd-12-2013-0166")
-        print("CONTAINER IS NONE?", container)
         self.assertIn("0000-0003-0530-4305", container)
         self.assertNotIn("0000-0001-5506-523X", of_2.get_orcid("10.1108/jd-12-2013-0166"))
 
@@ -196,10 +193,7 @@ class ResourceFinderTest(unittest.TestCase):
         # # Do use support files, but avoid using APIs
         nf_2 = NIHResourceFinder(issn=CSVManager(self.issn_path_pmid),
                                       pmid=CSVManager(self.pmid_path), use_api_service=False)
-        print("self.issn_path_pmid", self.issn_path_pmid)
-        print("self.pmid_path", self.pmid_path)
         container = nf_2.get_container_issn("1509982")
-        print("container", container)
         self.assertIn("0065-4299", container)
         self.assertNotIn("0065-4444", nf_2.get_container_issn("1509982"))
 

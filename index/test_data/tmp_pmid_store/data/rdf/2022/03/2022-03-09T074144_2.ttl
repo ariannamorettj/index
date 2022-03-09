@@ -1,0 +1,11 @@
+<https://w3id.org/oc/index/noci/ci/016001050009090802-016006050001050704> <http://purl.org/spar/cito/hasCitedEntity> <https://pubmed.ncbi.nlm.nih.gov/6501574> .
+<https://w3id.org/oc/index/noci/ci/016001050009090802-016006050001050704> <http://purl.org/spar/cito/hasCitingEntity> <https://pubmed.ncbi.nlm.nih.gov/1509982> .
+<https://w3id.org/oc/index/noci/ci/016001050009090802-016006050001050704> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://purl.org/spar/cito/Citation> .
+
+<https://w3id.org/oc/index/noci/ci/016001090608030102-01600103060703000807> <http://purl.org/spar/cito/hasCitingEntity> <https://pubmed.ncbi.nlm.nih.gov/1968312> .
+<https://w3id.org/oc/index/noci/ci/016001090608030102-01600103060703000807> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://purl.org/spar/cito/JournalSelfCitation> .
+<https://w3id.org/oc/index/noci/ci/016001090608030102-01600103060703000807> <http://purl.org/spar/cito/hasCitationCreationDate> "2003-08-22"^^<http://www.w3.org/2001/XMLSchema#date> .
+<https://w3id.org/oc/index/noci/ci/016001090608030102-01600103060703000807> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://purl.org/spar/cito/Citation> .
+<https://w3id.org/oc/index/noci/ci/016001090608030102-01600103060703000807> <http://purl.org/spar/cito/hasCitationTimeSpan> "P5Y3M"^^<http://www.w3.org/2001/XMLSchema#duration> .
+<https://w3id.org/oc/index/noci/ci/016001090608030102-01600103060703000807> <http://purl.org/spar/cito/hasCitedEntity> <https://pubmed.ncbi.nlm.nih.gov/13673087> .
+

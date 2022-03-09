@@ -164,7 +164,6 @@ class CreateNewCitationsTestPmid(unittest.TestCase):
                               self.date_file, self.orcid_file, self.issn_file, self.orcid, self.lookup, self.data,
                               self.prefix, self.agent, self.source, self.service, self.verbose, self.no_api, 1, self.id_type)
 
-        # la barra serve per andare a capo, restituisce tre numeri
         self.assertEqual(new_citations_added, 6)
         self.assertEqual(citations_already_present, 0)
         self.assertEqual(error_in_pmids_existence, 0)
@@ -183,4 +182,4 @@ class CreateNewCitationsTestPmid(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()  # Launch with "python text_cnc.py"
+    unittest.main()  # Launch with "python test_cnc.py"

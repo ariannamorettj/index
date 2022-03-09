@@ -22,6 +22,10 @@ from index.citation.oci import Citation
 from index.storer.citationstorer import CitationStorer
 from index.storer.datahandler import FileDataHandler
 import ray
+from timeit import default_timer as timer
+import time
+import os
+from pathlib import Path
 
 
 @ray.remote
@@ -152,7 +156,7 @@ if __name__ == "__main__":
 
     arg_parser.add_argument( "-c", "--pclass", required=True,
                              help="The name of the class of data source to use to process citatation data.",
-                             choices=['csv', 'crossref', 'croci'] )
+                             choices=['csv', 'crossref', 'croci', 'noci'] )
     arg_parser.add_argument( "-i", "--input", required=True,
                              help="The input file/directory to provide as input of the specified input "
                                   "Python file (using -p)." )
@@ -195,12 +199,64 @@ if __name__ == "__main__":
 
     args = arg_parser.parse_args()
 
+    def get_dir_size(path='.'):
+        total = 0
+        with os.scandir(path) as it:
+            for entry in it:
+                if entry.is_file():
+                    #print(Path(entry), "size:", os.path.getsize(entry))
+                    total += entry.stat().st_size
+                elif entry.is_dir():
+                    total += get_dir_size( entry.path )
+                    print( Path(entry), "size:", get_dir_size( entry.path ) )
+
+        return total
+
+
+
+    #calculate initial settings
+    inp = args.input
+    inp_path = Path(inp)
+    processed_data_path = (Path(args.data))
+
+    if inp_path.is_dir():
+        for filename in os.listdir(inp_path):
+            f = os.path.join(inp_path, filename)
+            file_size = os.path.getsize(f)
+            print( "input file:", f, "bytes:", file_size )
+    elif inp_path.is_file():
+        file_size = os.path.getsize(inp_path)
+        print( "input file:", inp_path, "bytes:", file_size)
+
+    start = timer()
+    processed_data_size_t0 = get_dir_size(processed_data_path)
+    print("start size of processed data:", processed_data_size_t0, "bytes")
+
     new_citations_added, citations_already_present, error_in_dois_existence = \
         execute_workflow( args.idbaseurl, args.baseurl, args.pclass,
                           args.input, args.doi_file, args.date_file, args.orcid_file,
                           args.issn_file, args.orcid, args.lookup, args.data,
                           args.prefix, args.agent, args.source, args.service,
                           args.verbose, args.no_api, args.process_number, args.id_type)
+
+    #calculate final settings
+    processed_data_path = (Path(args.data))
+    for filename in os.listdir(processed_data_path):
+        f = os.path.join(processed_data_path, filename)
+        file_size = os.path.getsize(f)
+        print("output file:", f, "bytes:", file_size)
+
+    end = timer()
+
+    #calculate elapsed time
+    print("elapsed time, in seconds:", (end-start))
+
+    #calculate size of processed data
+    processed_data_size_t1 = get_dir_size(processed_data_path)
+    print("final size of processed data:", processed_data_size_t1)
+    print("bytes processed:", (int(processed_data_size_t1) - int(processed_data_size_t0)))
+
+
 
     print( "\n# Summary\n"
            "Number of new citations added to the OpenCitations Index: %s\n"
@@ -211,5 +267,8 @@ if __name__ == "__main__":
 # How to call the service (e.g. for COCI)
 # python cnc.py -ib "http://dx.doi.org/" -b "https://w3id.org/oc/index/coci/" -c "csv" -i "index/test_data/citations_partial.csv" -doi "index/coci_test/doi.csv" -orcid "index/coci_test/orcid.csv" -date "index/coci_test/date.csv" -issn "index/coci_test/issn.csv" -l "index/test_data/lookup_full.csv" -d "index/coci_test" -px "020" -a "https://w3id.org/oc/index/prov/pa/1" -s "https://api.crossref.org/works/[[citing]]" -sv "OpenCitations Index: COCI" -type "doi" -v
 
-# How to call the service (e.g. for NOCI)
+# How to call the service (e.g. for NOCI) starting from partial citations (6 field csv already)
 # python cnc.py -ib "https://pubmed.ncbi.nlm.nih.gov/" -b "https://w3id.org/oc/index/noci/" -c "csv" -i "index/test_data/citations_partial_pmid.csv" -doi "index/noci_test/pmid.csv" -orcid "index/noci_test/orcid.csv" -date "index/noci_test/date.csv" -issn "index/noci_test/issn.csv" -l "index/test_data/lookup_full.csv" -d "index/noci_test" -px "0160" -a "https://w3id.org/oc/index/prov/ra/1" -s "https://doi.org/10.35092/yhjc.c.4586573.v16" -sv "OpenCitations Index: NOCI" -type "pmid" -v
+
+# How to call the service (e.g. for NOCI) starting from the source data (2 field csv from NIH OCC source)
+# python cnc.py -ib "https://pubmed.ncbi.nlm.nih.gov/" -b "https://w3id.org/oc/index/noci/" -c "noci" -i "index/test_data/occ_reduced_60.csv" -doi "index/noci_test/pmid.csv" -orcid "index/noci_test/orcid.csv" -date "index/noci_test/date.csv" -issn "index/noci_test/issn.csv" -l "index/test_data/lookup_full.csv" -d "index/noci_test" -px "0160" -a "https://w3id.org/oc/index/prov/ra/1" -s "https://doi.org/10.35092/yhjc.c.4586573.v16" -sv "OpenCitations Index: NOCI" -type "pmid" -v

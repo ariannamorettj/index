@@ -29,7 +29,7 @@ class ORCIDResourceFinder(ApiIDResourceFinder):
         self.use_api_service = use_api_service
         self.api = "https://pub.orcid.org/v2.1/search?q="
         super(ORCIDResourceFinder, self).__init__(date=date, orcid=orcid, issn=issn, id=doi, id_type=OCIManager.doi_type,
-                                                  use_api_service=use_api_service) # parameter is called id instead of doi in ResourceFinder
+                                                  use_api_service=use_api_service)
 
     def _get_orcid(self, json_obj):
         result = set()

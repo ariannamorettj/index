@@ -22,11 +22,6 @@ from datetime import datetime
 from bs4 import BeautifulSoup
 import re
 
-#se ha i file specificati li cerca lì dentro, se non li trova (sono none, come sono inizializzati), cerca in api.
-#il glob, invece, crea i file a partire dal dump.
-#la classe citations calcola il timespan tra citante e citato
-
-
 class NIHResourceFinder(ApiIDResourceFinder):
     def __init__(self, date=None, orcid=None, issn=None, pmid=None, use_api_service=True):
         self.use_api_service = use_api_service
@@ -38,31 +33,25 @@ class NIHResourceFinder(ApiIDResourceFinder):
     def _get_issn(self, txt_obj):
         result = set()
         issns = re.findall("IS\s+-\s+\d{4}-\d{4}", txt_obj)
-        print("THIS OBJECT IS ISSNS, risultato di re.findall", issns)
         for i in issns:
             issn = re.search("\d{4}-\d{4}", i).group(0)
-            print("THIS OBJECT IS ISSN, risultato di re.search", issn)
             result.add(issn)
         return result
 
     def _get_date(self, txt_obj):
         date = re.search("DP\s+-\s+(\d{4}(\s?(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec))?(\s?((3[0-1])|([1-2][0-9])|([0]?[1-9])))?)", txt_obj).group(1)
-        print("this is date", date)
         re_search = re.search("(\d{4})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+((3[0-1])|([1-2][0-9])|([0]?[1-9]))", date)
         if re_search is not None:
-            print("FULL DATE!")
             result = re_search.group(0)
             datetime_object = datetime.strptime(result, '%Y %b %d')
             return datetime.strftime(datetime_object, '%Y-%m-%d')
         else:
-            print("NO! DAY MISSING....")
             re_search = re.search("(\d{4})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)", date)
             if re_search is not None:
                 result = re_search.group(0)
                 datetime_object = datetime.strptime(result, '%Y %b')
                 return datetime.strftime(datetime_object, '%Y-%m')
             else:
-                print( "NO! MONTH AND DAY MISSING...." )
                 re_search = re.search("(\d{4})", date)
                 if re_search is not None:
                     result = re.search("(\d{4})", date).group(0)
@@ -81,8 +70,3 @@ class NIHResourceFinder(ApiIDResourceFinder):
                 soup = BeautifulSoup(r.text, features="lxml")
                 mdata = str(soup.find(id="article-details"))
                 return mdata
-
-
-
-
-        #SE TUTTI I TEST DI TUTTE QUESTE COSE FUNZIONANO CORRETTAMENTE TORNA AL PROCESSO PRINCIPALE CNC E CERCARE DI FAR FUNZIONARE QUESTO. PASSARE TEST NOCI E LANCIARE CNC CON LE COSE DI NOCI
