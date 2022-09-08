@@ -33,10 +33,9 @@ from oc.index.identifier.doi import DOIManager
 from oc.index.identifier.pmid import PMIDManager
 from oc.index.identifier.issn import ISSNManager
 from oc.index.identifier.orcid import ORCIDManager
-from oc.index.finder.orcid import ORCIDResourceFinder
+from oc.index.finder.orcid import ORCIDResourceFinder, ORCIDResourceFinderPMID
 from oc.index.finder.crossref import CrossrefResourceFinder
 from oc.index.glob.csv import CSVDataSource
-
 
 def check_author_identity_api(uri, authors_dicts_list, orcid_client_id, orcid_client_secret):
     data = {"client_id": orcid_client_id, "client_secret": orcid_client_secret,"grant_type": "client_credentials", "scope": "/read-public" }
@@ -44,24 +43,31 @@ def check_author_identity_api(uri, authors_dicts_list, orcid_client_id, orcid_cl
     identity_verified = False
     if response.status_code == 200:
         json_response = response.json()
-        person = json_response["person"]
-        g_names = person["name"]["given-names"]["value"]
-        f_name = person["name"]["family-name"]["value"]
-        orcid_author_surnames_list = re.findall(
-                        "[a-zA-Z\'\-áéíóúäëïöüÄłŁőŐűŰZàáâäãåąčćęèéêëėįìíîïłńòóôöõøùúûüųūÿýżźñçčšžÀÁÂÄÃÅĄĆČĖĘÈÉÊËÌÍÎÏĮŁŃÒÓÔÖÕØÙÚÛÜŲŪŸÝŻŹÑßÇŒÆČŠŽñÑâê]{2,}",
-                        f_name)
-        orcid_author_surnames_list_l = [x.lower() for x in orcid_author_surnames_list]
-        orcid_author_names_list = re.findall(
-                        "[a-zA-Z\'\-áéíóúäëïöüÄłŁőŐűŰZàáâäãåąčćęèéêëėįìíîïłńòóôöõøùúûüųūÿýżźñçčšžÀÁÂÄÃÅĄĆČĖĘÈÉÊËÌÍÎÏĮŁŃÒÓÔÖÕØÙÚÛÜŲŪŸÝŻŹÑßÇŒÆČŠŽñÑâê]{2,}",
-                        g_names)
-        orcid_author_names_list_l = [x.lower() for x in orcid_author_names_list]
-
-        matches = [dict for dict in authors_dicts_list if
-                   [sn for sn in dict["surnames"] if sn in orcid_author_surnames_list_l] and [l for l in dict["names"] if any(
-                       element.startswith(l) and element not in dict["surnames"] for element in orcid_author_names_list_l)]]
-
-        if matches:
-            identity_verified = True
+        if json_response is not None and json_response != {}:
+            person = json_response["person"]
+            if person != None and person != {}:
+                if "name" in person.keys():
+                    given_names = [v for k,v in person["name"].items() if k =="given-names" and v is not None]
+                    if given_names:
+                        if "value" in person["name"]["given-names"]:
+                            g_names = person["name"]["given-names"]["value"]
+                            family_name = [v for k,v in person["name"].items() if k =="family-name" and v is not None]
+                            if family_name:
+                                if "value" in person["name"]["family-name"]:
+                                    f_name = person["name"]["family-name"]["value"]
+                                    orcid_author_surnames_list = re.findall(
+                                                    "[a-zA-Z\'\-áéíóúäëïöüÄłŁőŐűŰZàáâäãåąčćęèéêëėįìíîïłńòóôöõøùúûüųūÿýżźñçčšžÀÁÂÄÃÅĄĆČĖĘÈÉÊËÌÍÎÏĮŁŃÒÓÔÖÕØÙÚÛÜŲŪŸÝŻŹÑßÇŒÆČŠŽñÑâê]{2,}",
+                                                    f_name)
+                                    orcid_author_surnames_list_l = [x.lower() for x in orcid_author_surnames_list]
+                                    orcid_author_names_list = re.findall(
+                                    "[a-zA-Z\'\-áéíóúäëïöüÄłŁőŐűŰZàáâäãåąčćęèéêëėįìíîïłńòóôöõøùúûüųūÿýżźñçčšžÀÁÂÄÃÅĄĆČĖĘÈÉÊËÌÍÎÏĮŁŃÒÓÔÖÕØÙÚÛÜŲŪŸÝŻŹÑßÇŒÆČŠŽñÑâê]{2,}",
+                                    g_names)
+                                    orcid_author_names_list_l = [x.lower() for x in orcid_author_names_list]
+                                    matches = [dict for dict in authors_dicts_list if
+                               [sn for sn in dict["surnames"] if sn in orcid_author_surnames_list_l] and [l for l in dict["names"] if any(
+                                   element.startswith(l) and element not in dict["surnames"] for element in orcid_author_names_list_l)]]
+                                    if matches:
+                                        identity_verified = True
     return identity_verified
 
 
@@ -126,6 +132,8 @@ def process_noci(input_dir, output_dir, n, id_orcid_dir=None, orcid_client_id=No
     journal_issn_dict = issn_data_recover_noci(output_dir)
     crossref_resource_finder = CrossrefResourceFinder()
     orcid_resource_finder = ORCIDResourceFinder()
+    pmid_orcid_resource_finder = ORCIDResourceFinderPMID()
+
 
     doi_manager = DOIManager()
     issn_manager = ISSNManager()
@@ -179,6 +187,25 @@ def process_noci(input_dir, output_dir, n, id_orcid_dir=None, orcid_client_id=No
                         if citing_date is not None:
                             entity["date"] = [citing_date]
 
+                        if orcid_client_id and orcid_client_secret:
+                            json_res_pmid = pmid_orcid_resource_finder._call_api(citing_pmid)
+                            if json_res_pmid is not None and len(json_res_pmid) > 0:
+                                pmid_certified_orcid = []
+                                for orcid_dict_pmid in json_res_pmid:
+                                    pmid_json_uri = orcid_dict_pmid["orcid-identifier"]["uri"]
+                                    pmid_chek_passed = check_author_identity_api(pmid_json_uri, authors_dicts_list,
+                                                                                    orcid_client_id,
+                                                                                    orcid_client_secret)
+                                    pmid_norm_orc = orcid_manager.normalise(pmid_json_uri)
+                                    if pmid_chek_passed and pmid_norm_orc:
+                                        pmid_certified_orcid.append(pmid_norm_orc)
+
+                                if len(pmid_certified_orcid) > 0:
+                                    entity["orcid"] = pmid_certified_orcid
+                                    if citing_pmid in pmid_doi_map.keys():
+                                        pmid_doi_map[citing_pmid]["has_orcid"] = True
+
+
                         issn_list = []
                         journal_name = row["journal"]
                         if journal_name:
@@ -209,6 +236,8 @@ def process_noci(input_dir, output_dir, n, id_orcid_dir=None, orcid_client_id=No
                             entity["issn"] = issn_list
 
                         csv_datasource.set(citing_pmid, entity)
+
+            pmid_doi_map = {k:v for k,v in pmid_doi_map.items() if v["has_orcid"] is False}
 
             if len(pmid_doi_map) > 0:
                 if id_orcid_dir and exists(id_orcid_dir):
